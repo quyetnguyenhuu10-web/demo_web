@@ -1,0 +1,7 @@
+/* Reset Vite default styles để không phá style của app */
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

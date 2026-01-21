@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>web_ui – Chat (Standalone)</title>
+
+  <!-- CRITICAL: Apply theme và kích thước TRƯỚC khi CSS render -->
+  <!-- Script này PHẢI chạy trước <style> tag để set CSS variables ngay -->
+  <script>
+    // IIFE chạy ngay khi parse, TRƯỚC khi CSS được apply
+    (function() {
+      'use strict';
+      const root = document.documentElement;
+      
+      try {
+        // 1. Apply theme trước
+        const THEME_KEY = "ui_theme";
+        const saved = localStorage.getItem(THEME_KEY);
+        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved === "dark" || saved === "light" ? saved : (systemDark ? "dark" : "light");
+        root.setAttribute("data-theme", theme);
+        
+        // 2. Apply topbar height - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
+        const TOPBAR_SIZE_KEY = "ui_topbar_h";
+        const TOPBAR_MIN = 20;
+        const TOPBAR_MAX = 56;
+        const topbarSaved = parseInt(localStorage.getItem(TOPBAR_SIZE_KEY) || "", 10);
+        if (Number.isFinite(topbarSaved) && topbarSaved >= TOPBAR_MIN && topbarSaved <= TOPBAR_MAX) {
+          const clamped = Math.max(TOPBAR_MIN, Math.min(TOPBAR_MAX, topbarSaved));
+          const pillH = Math.max(16, Math.min(34, Math.round(clamped * 0.64)));
+          // Set inline style - có priority cao nhất
+          root.style.setProperty("--topbar-h", clamped + "px");
+          root.style.setProperty("--topbar-pill-h", pillH + "px");
+        }
+        
+        // 3. Apply chat width - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
+        const CHAT_W_KEY = "ui_chat_w";
+        const CHAT_MIN = 280;
+        const CHAT_MAX = 560;
+        const chatSaved = parseInt(localStorage.getItem(CHAT_W_KEY) || "", 10);
+        if (Number.isFinite(chatSaved) && chatSaved >= CHAT_MIN && chatSaved <= CHAT_MAX) {
+          const clamped = Math.max(CHAT_MIN, Math.min(CHAT_MAX, chatSaved));
+          // Set inline style - có priority cao nhất
+          root.style.setProperty("--chat-w", clamped + "px");
+        }
+      } catch(e) {
+        // Fallback nếu localStorage bị block
+        console.warn("Error applying saved UI settings:", e);
+      }
+    })();
+  </script>
+
+  <!-- CSS chính - script trên đã set inline style cho CSS variables -->
+  <style>
+    :root{
+      /* Warm paper base */
+      --bg: #f5f1ea;         /* nền chính: giấy ấm */
+      --bg-soft: #f7f3ed;    /* pane trái */
+      --pane: #f1ece4;
+
+      /* Panels */
+      --panel: #fbf8f3;      /* panel chat: sáng nhưng không trắng gắt */
+      --panel-soft: #fdfaf6;
+      --panel-stone: #f3eee6;
+
+      /* Text */
+      --text: #1c1a17;       /* charcoal ấm */
+      --muted: #6c625a;      /* xám ấm */
+      --placeholder: #8a8077;
+
+      /* ===== Bubbles (LIGHT) ===== */
+      /* User: warm latte (rõ hơn nền/panel) */
+      --userBubble: #efe1cf;
+      --userBubbleBorder: rgba(28,26,23,0.14);
+      --userText: #1c1a17;
+
+      /* AI: text block (document-like, không bubble) */
+      --aiText: rgba(28,26,23,0.92);
+      
+      /* Borders: rất nhẹ, tinh tế */
+      --border: rgba(28,26,23,0.10);
+      --border-soft: rgba(28,26,23,0.16);
+
+      /* Accent: beige-gold nhẹ */
+      --accent: #b79f7a;
+
+      /* Shadow: mềm, không nặng */
+      --shadow-soft:
+        0 1px 2px rgba(28,26,23,0.05),
+        0 10px 26px rgba(28,26,23,0.08);
+
+      --msg-top-inset: 5px;
+
+      /* ===== Topbar sizing (SSOT) ===== */
+      --topbar-h: 28px;     /* chỉnh chiều cao topbar ở đây */
+      --topbar-pad-x: 10px; /* padding ngang cho nút/clock */
+      --topbar-pill-h: 18px;/* chiều cao "pill" (clock/toggle) bên trong */
+
+      /* ===== Chat sizing (SSOT) ===== */
+      --chat-w: 380px;          /* width mặc định của panel chat */
+      --chat-min-w: 280px;
+      --chat-max-w: 560px;      /* tuỳ bạn muốn */
+
+      /* =========================
+         TOPBAR + CLOCK — LIGHT
+         ========================= */
+
+      /* Topbar: warm paper */
+      --topbar-a: #fbf6ee;          /* giấy sáng */
+      --topbar-b: #f0e6d6;          /* giấy đậm nhẹ */
+      --topbar-fg: #1c1a17;         /* chữ charcoal ấm */
+      --topbar-border: rgba(28,26,23,0.12);
+      --topbar-glass: rgba(255,255,255,0.65);
+
+      /* Clock: champagne */
+      --clock-fg: #1c1a17;          /* chữ giờ */
+      --clock-icon: #d4b77c;       /* champagne gold */
+      --clock-border: rgba(212,183,124,0.45);
+      --clock-glass: rgba(212,183,124,0.18);
+
+      /* ===== Scrollbar (LIGHT) ===== */
+      --sb-track: rgba(28,26,23,0.06);
+      --sb-thumb: rgba(28,26,23,0.22);
+      --sb-thumb-hover: rgba(28,26,23,0.32);
+    }
+
+    :root[data-theme="dark"]{
+      /* Warm charcoal base */
+      --bg: #0f0e0d;         /* nền tổng thể: than ấm */
+      --bg-soft: #141210;    /* pane trái: ấm, không xanh */
+      --pane: #171412;
+
+      /* Panels */
+      --panel: #141210;      /* chat panel */
+      --panel-soft: #171412;
+      --panel-stone: #1c1916;
+
+      /* Text */
+      --text: #ece6dd;       /* trắng ngà */
+      --muted: #b9b0a6;      /* xám ấm */
+      --placeholder: #8f877f;
+
+      /* ===== Bubbles (DARK) ===== */
+      /* User: warm cocoa (nổi trên panel tối) */
+      --userBubble: #241f1a;
+      --userBubbleBorder: rgba(236,230,221,0.14);
+      --userText: #f1ebe3;
+
+      /* AI: text block (document-like, không bubble) */
+      --aiText: rgba(236,230,221,0.92);
+
+      /* Borders */
+      --border: rgba(236,230,221,0.10);
+      --border-soft: rgba(236,230,221,0.16);
+
+      /* Accent (ấm, nhẹ) */
+      --accent: #c9b79c;     /* beige-gold rất nhẹ */
+
+      /* Shadow: mềm, ít tương phản */
+      --shadow-soft:
+        0 1px 2px rgba(0,0,0,0.35),
+        0 10px 28px rgba(0,0,0,0.45);
+
+      /* =========================
+         TOPBAR + CLOCK — DARK
+         ========================= */
+
+      /* Topbar: warm charcoal */
+      --topbar-a: #0e0d0c;
+      --topbar-b: #161311;
+      --topbar-fg: #ece6dd;        /* ivory */
+      --topbar-border: rgba(255,255,255,0.14);
+      --topbar-glass: rgba(255,255,255,0.08);
+
+      /* Clock: sage / mint khói */
+      --clock-fg: #ece6dd;
+      --clock-icon: #9fb7a6;       /* sage */
+      --clock-border: rgba(159,183,166,0.40);
+      --clock-glass: rgba(159,183,166,0.14);
+
+      /* ===== Scrollbar (DARK) ===== */
+      --sb-track: rgba(236,230,221,0.06);
+      --sb-thumb: rgba(236,230,221,0.22);
+      --sb-thumb-hover: rgba(236,230,221,0.32);
+    }
+
+    *{ box-sizing:border-box; }
+
+    html, body{
+      height:100%;
+      width:100%;
+      margin:0;
+      padding:0;
+    }
+
+    body{
+      background:var(--bg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:var(--text);
+      overflow:hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ===== Topbar layout: clean (no system log) ===== */
+    .topbar{
+      position:relative;
+      height: var(--topbar-h, 28px); /* Fallback để tránh layout shift */
+      background: linear-gradient(180deg, var(--topbar-a), var(--topbar-b));
+      color: var(--topbar-fg);
+      border-bottom: 1px solid var(--topbar-border);
+      /* Tránh layout shift khi load */
+      contain: layout style;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+
+      display:grid;
+      grid-template-columns: 1fr 0fr 1fr;
+      align-items:center;
+      padding: 0 var(--topbar-pad-x, 10px);
+    }
+
+    .tbLeft{ justify-self:start; display:flex; align-items:center; }
+    .tbCenter{ justify-self:center; }
+    .tbRight{ justify-self:end; display:flex; align-items:center; gap:10px; }
+
+    .app{
+      height: calc(100vh - var(--topbar-h, 28px)); /* Fallback để tránh layout shift */
+      height: calc(100dvh - var(--topbar-h, 28px));
+      width:100%;
+      display:flex;
+      overflow:hidden;
+      /* Tránh layout shift khi load */
+      contain: layout;
+    }
+
+    .leftPane{
+      flex:1 1 auto;
+      min-width:0;
+      background:var(--bg-soft);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      border-right:1px solid var(--border);
+    }
+
+    .coming{
+      max-width:640px;
+      width:100%;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      text-align: center;
+    }
+    .coming .badge{
+      display: none;
+    }
+    .coming h1{
+      display: none;
+    }
+    .coming p{
+      display: none;
+    }
+    .coming::before{
+      content: "Coming soon";
+      display: block;
+      font-size: 72px;
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      opacity: 0.25;
+      line-height: 1;
+      
+      /* Glow effect nhẹ */
+      text-shadow: 
+        0 0 20px rgba(108, 98, 90, 0.15),
+        0 0 40px rgba(108, 98, 90, 0.08);
+    }
+
+    /* Dark mode: glow mạnh hơn một chút */
+    :root[data-theme="dark"] .coming::before{
+      text-shadow: 
+        0 0 24px rgba(185, 176, 166, 0.20),
+        0 0 48px rgba(185, 176, 166, 0.10),
+        0 0 72px rgba(185, 176, 166, 0.05);
+    }
+
+    .chat{
+      width: var(--chat-w, 380px); /* Fallback để tránh layout shift */
+      min-width: var(--chat-min-w, 280px);
+      max-width: var(--chat-max-w, 560px);
+
+      height:100%;
+      min-height:0;
+      overflow:hidden;
+      background:var(--panel);
+      /* Tránh layout shift khi load */
+      contain: layout style;
+      box-shadow:
+        -10px 0 24px rgba(0,0,0,0.12),
+        -2px 0 6px rgba(0,0,0,0.08);
+      display:flex;
+      flex-direction:column;
+      position: relative; /* để gắn resizer */
+    }
+
+    :root[data-theme="dark"] .chat{
+      box-shadow:
+        -10px 0 24px rgba(0,0,0,0.50),
+        -2px 0 6px rgba(0,0,0,0.35);
+    }
+
+    .wrap{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+
+    .scrollArea{
+      flex:1;
+      min-height:0;
+      overflow:auto;
+      padding:
+        calc(var(--msg-top-inset) + env(safe-area-inset-top, 0px))
+        18px
+        18px
+        18px;
+      scroll-behavior:smooth;
+      scroll-padding-top:
+        calc(var(--msg-top-inset) + env(safe-area-inset-top, 0px));
+    }
+
+    .messages{
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .turn{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .ai{
+      background: transparent;
+      border: none;
+      box-shadow: none;
+
+      color: var(--aiText);
+      font-size:15px;
+      line-height:1.65;
+
+      padding: 0;               /* KHÔNG padding */
+      margin: 0;                /* spacing do .turn kiểm soát */
+
+      max-width:100%;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+
+    .aiPlain{
+      color: var(--aiText);
+    }
+
+    .aiRender > :first-child,
+    .ai > :first-child{
+      margin-top:0;
+    }
+
+    .aiRender > :last-child,
+    .ai > :last-child{
+      margin-bottom:0;
+    }
+
+    .aiRender > p{
+      margin: 0 0 0.8em;
+    }
+
+    .userWrap{
+      align-self:flex-end;
+      display:inline-flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:6px;
+      max-width:85%;
+      position:relative;
+      margin-top:-3px;
+    }
+    
+    /* Copy button nằm dưới user bubble */
+    .userWrap .copyBtn{
+      order: 2; /* Đặt copy button xuống dưới */
+      margin-top: 2px;
+      align-self: flex-end;
+    }
+    
+    .userWrap .user{
+      order: 1; /* User bubble ở trên */
+    }
+
+    .user{
+      background: var(--userBubble);
+      color: var(--userText);
+      border: 1px solid var(--userBubbleBorder);
+
+      border-radius:18px;
+      padding:10px 14px;
+      box-shadow: var(--shadow-soft);
+
+      font-size:15px;
+      line-height:1.35;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+
+    .userText{ display:block; }
+
+    .copyBtn{
+      width:22px;
+      height:22px;
+      border:none;
+      border-radius:6px;
+      background:transparent;
+      color:#333;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      opacity:0;
+      transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+      pointer-events:none;
+      position:relative;
+    }
+
+    .userWrap:hover .copyBtn,
+    .copyBtn:focus-visible{
+      opacity:1;
+      pointer-events:auto;
+    }
+
+    .copyBtn:hover{ background: rgba(28,26,23,0.06); }
+
+    :root[data-theme="dark"] .copyBtn{
+      color: #cbd5e1;
+    }
+
+    :root[data-theme="dark"] .copyBtn:hover{
+      background: rgba(226,232,240,0.08);
+    }
+
+    .copyBtn::after{
+      content: attr(data-tooltip);
+      position:absolute;
+      right:0;
+      bottom:calc(100% + 6px);
+      padding:4px 6px;
+      border-radius:6px;
+      font-size:11px;
+      background: var(--panel);
+      border: 1px solid rgba(28,26,23,0.10);
+      color: rgba(28,26,23,0.92);
+      box-shadow:0 6px 14px rgba(15,17,21,0.12);
+      white-space:nowrap;
+      opacity:0;
+      transform: translateY(2px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      pointer-events:none;
+    }
+
+    .copyBtn:hover::after,
+    .copyBtn:focus-visible::after{
+      opacity:1;
+      transform: translateY(0);
+    }
+
+    .bar{
+      padding:14px;
+      border-top:1px solid var(--border);
+      background:var(--panel);
+      flex:0 0 auto;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Model selector container - bên trên chatComposer */
+    .modelSelectorContainer{
+      display: flex !important;
+      align-items: center;
+      padding-bottom: 6px; /* Giảm padding */
+      min-height: 24px; /* Thu nhỏ */
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+
+    .chatComposer{
+      --send-size: 30px;
+      --send-icon-size: 20px;
+
+      display:grid;
+      grid-template-columns: 1fr var(--send-size);
+      align-items:center;
+      gap:12px;
+
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft);
+
+      padding: 8px 10px 8px 18px; /* Padding dọc để căn giữa */
+      min-height: 40px; /* Min-height phù hợp */
+      max-height: 170px; /* Giảm max-height để không quá cao */
+      overflow:hidden;
+    }
+
+    /* Model selector wrapper */
+    .modelSelectorWrapper{
+      position: relative;
+      display: inline-flex !important;
+      align-items: center;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+
+    /* Model selector - style như button với dropdown */
+    .modelSelector{
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      padding: 6px 28px 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(28, 26, 23, 0.08);
+      color: var(--text, #1c1a17);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      font-family: inherit;
+      transition: background 0.2s ease;
+      min-width: 120px;
+      height: 28px;
+      line-height: 1;
+      display: block !important; /* Đảm bảo hiển thị */
+      visibility: visible !important;
+      opacity: 1 !important;
+      z-index: 10;
+    }
+
+    /* Dropdown arrow - chỉ hiển thị khi dùng select element (không dùng với custom dropdown) */
+    .modelSelectorWrapper::after{
+      content: "▼";
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      font-size: 0.7rem;
+      color: var(--muted, #6c625a);
+      opacity: 0.7;
+    }
+    
+    /* Ẩn ::after khi dùng custom dropdown */
+    .modelSelectorWrapper.hasCustomDropdown::after {
+      display: none;
+    }
+
+    .modelSelector:hover:not(:disabled){
+      background: rgba(28, 26, 23, 0.12);
+    }
+
+    .modelSelector:disabled{
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .modelSelector:focus{
+      background: rgba(28, 26, 23, 0.12);
+    }
+
+    /* Dark mode */
+    :root[data-theme="dark"] .modelSelector{
+      background: rgba(236, 230, 221, 0.08);
+      color: var(--text, #ece6dd);
+    }
+
+    :root[data-theme="dark"] .modelSelector:hover:not(:disabled){
+      background: rgba(236, 230, 221, 0.12);
+    }
+
+    :root[data-theme="dark"] .modelSelector:focus{
+      background: rgba(236, 230, 221, 0.12);
+    }
+
+    :root[data-theme="dark"] .modelSelectorWrapper::after{
+      color: var(--muted, #9ca3af);
+    }
+
+    /* Custom dropdown list styles */
+    .modelDropdownList {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sb-thumb) var(--sb-track);
+    }
+
+    .modelDropdownList::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .modelDropdownList::-webkit-scrollbar-track {
+      background: var(--sb-track);
+      border-radius: 4px;
+    }
+
+    .modelDropdownList::-webkit-scrollbar-thumb {
+      background: var(--sb-thumb);
+      border-radius: 4px;
+    }
+
+    .modelDropdownList::-webkit-scrollbar-thumb:hover {
+      background: var(--sb-thumb-hover);
+    }
+
+    /* Dark mode cho dropdown list */
+    :root[data-theme="dark"] .modelDropdownList {
+      background: var(--panel, #141210);
+      border-color: var(--border, rgba(236,230,221,0.10));
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.35);
+    }
+
+    :root[data-theme="dark"] .modelDropdownList button {
+      color: var(--text, #ece6dd);
+    }
+
+    :root[data-theme="dark"] .modelDropdownList button:hover {
+      background: rgba(236,230,221,0.08) !important;
+    }
+
+    :root[data-theme="dark"] .modelDropdownList button[style*="rgba(28,26,23,0.08)"] {
+      background: rgba(236,230,221,0.12) !important;
+    }
+
+    .chatComposer:focus-within{
+      border-color: var(--border-soft);
+      box-shadow:
+        0 0 0 3px rgba(111,143,175,0.14),
+        var(--shadow-soft);
+    }
+
+    .chatComposerInput{
+      width:100%;
+      min-width:0;
+      border:none;
+      outline:none;
+      background:transparent;
+
+      font-size:16px;
+      font-family:inherit;
+      line-height:1.5; /* Line-height chuẩn */
+      text-align:left; /* Căn trái placeholder và text */
+
+      resize:none;
+      padding: 0; /* Không padding dọc - để chatComposer padding làm việc */
+      margin:0;
+      max-height: 150px; /* Giảm max-height để không làm chatComposer giãn ra */
+
+      overflow-x:hidden;
+      overflow-y:auto;
+      /* Ẩn scrollbar khi không cần scroll */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+      
+      /* Căn giữa theo chiều dọc */
+      vertical-align:middle;
+
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+
+      color: var(--text);
+      caret-color: rgba(28,26,23,0.65);
+    }
+
+    .chatComposerInput::placeholder{
+      color: var(--placeholder, rgba(138,128,119,0.75)); /* Dùng biến CSS và tăng opacity để rõ hơn trong light mode */
+    }
+
+    :root[data-theme="dark"] .chatComposer{
+      background: #181512; /* sáng hơn panel 1 chút */
+    }
+
+    :root[data-theme="dark"] .chatComposerInput{
+      color: #f1ebe3;              /* trắng ngà, KHÔNG trắng gắt */
+      caret-color: #e6dccf;        /* con trỏ rõ nhưng dịu */
+    }
+
+    :root[data-theme="dark"] .chatComposerInput::placeholder{
+      color: rgba(241,235,227,0.45);
+    }
+
+    .chatSend{
+      width:var(--send-size);
+      height:var(--send-size);
+      border-radius:50%;
+      border:none;
+      background: #1c1a17;   /* charcoal ấm */
+      color: var(--panel);
+      cursor:pointer;
+
+      display:grid;
+      place-items:center;
+      padding:0;
+      line-height:0;
+    }
+
+    .chatSend:disabled{
+      background: rgba(28,26,23,0.35);
+      color: rgba(251,248,243,0.85);
+      cursor:not-allowed;
+    }
+
+    :root[data-theme="dark"] .chatSend{
+      background: #e6dccf;   /* beige sáng */
+      color: #141210;        /* chữ/icon tối */
+    }
+
+    :root[data-theme="dark"] .chatSend:disabled{
+      background: rgba(230,220,207,0.35);
+      color: rgba(20,18,16,0.55);
+    }
+
+    .sendIcon{
+      width:var(--send-icon-size);
+      height:var(--send-icon-size);
+      display:block;
+    }
+
+
+    /* ===== Topbar resizer (drag like Cursor) ===== */
+    .topbarResizer{
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:-3px;              /* "ăn" xuống app để dễ bắt */
+      height:6px;               /* vùng hit */
+      cursor: ns-resize;
+      touch-action: none;       /* quan trọng cho mobile */
+      background: transparent;
+    }
+
+    .topbarResizer::after{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      top:2px;                  /* line nằm giữa vùng hit */
+      height:1px;
+      background: rgba(255,255,255,0.10);
+      opacity:0.0;
+      transition: opacity 0.15s ease;
+    }
+
+    .topbar:hover .topbarResizer::after{
+      opacity:0.9;
+    }
+
+    /* khi đang kéo */
+    :root[data-resizing="topbar"] .topbarResizer::after{
+      opacity:1;
+      background: rgba(255,255,255,0.20);
+    }
+
+    /* ===== Chat resizer (drag like Cursor) ===== */
+    .chatResizer{
+      position:absolute;
+      left:-8px;        /* "ăn" ra ngoài để dễ bắt hơn */
+      top:0;
+      bottom:0;
+      width:16px;        /* vùng hit rộng hơn để dễ bắt */
+      cursor: ew-resize;
+      touch-action: none;
+      background: transparent;
+      z-index: 5;
+    }
+
+    .chatResizer::after{
+      content:"";
+      position:absolute;
+      top:0;
+      bottom:0;
+      left:7px;          /* line nằm giữa vùng hit */
+      width:1px;
+      background: var(--border-soft);
+      opacity:0.0;
+      transition: opacity 0.15s ease;
+    }
+
+    .chat:hover .chatResizer::after{
+      opacity:0.9;
+    }
+
+    /* khi đang kéo */
+    :root[data-resizing="chat"] .chatResizer::after{
+      opacity:1;
+      background: var(--accent);
+    }
+
+    /* ===== Clock (kept) ===== */
+    .clockWidget{
+      height: var(--topbar-pill-h, 20px);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:0 10px;
+      border-radius:999px;
+
+      border: 1px solid var(--clock-border);
+      background: var(--clock-glass);
+      color: var(--clock-fg);
+
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      user-select:none;
+    }
+
+    .clockSvg{ width:14px; height:14px; color: var(--clock-icon); }
+    #clockTime{ font-variant-numeric: tabular-nums; }
+
+    /* kim quay nhẹ */
+    .clockHand{
+      transform-origin: 12px 12px;
+      animation: clockSpin 6s linear infinite;
+    }
+    @keyframes clockSpin{ from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+    /* ===== Cursor-like theme toggle (centered thumb) ===== */
+    .themeToggle{
+      /* sizing */
+      --toggle-pad: 4px;
+      --toggle-w: clamp(64px, calc(var(--topbar-pill-h, 20px) * 3.0), 84px);
+      --thumb: calc(var(--topbar-pill-h, 20px) - 8px);
+      --seg: calc((var(--toggle-w) - 2 * var(--toggle-pad)) / 2);
+      --thumb-offset: calc((var(--seg) - var(--thumb)) / 2);
+
+      position:relative;
+      height: var(--topbar-pill-h, 20px);
+      width: var(--toggle-w);
+
+      border-radius: 999px;
+      border: 1px solid var(--topbar-border);
+      background: var(--topbar-glass);
+      color: var(--topbar-fg);
+
+      padding: 0 var(--toggle-pad);
+      cursor:pointer;
+      overflow:hidden;
+
+      /* layout: 2 halves */
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      align-items:center;
+    }
+
+    .themeToggle:hover{
+      background: rgba(255,255,255,0.16);
+    }
+
+    /* Icon style: Lucide-like */
+    .themeIcon{
+      width: 16px;
+      height: 16px;
+      justify-self: center;
+      align-self: center;
+      z-index: 2;
+      pointer-events: none;
+
+      opacity: 0.62;                /* default = inactive */
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .themeIcon.sun{ grid-column: 1; }
+    .themeIcon.moon{ grid-column: 2; }
+
+    /* Active icon: LIGHT => sun active */
+    :root:not([data-theme="dark"]) .themeIcon.sun{
+      opacity: 0.95;
+      transform: translateY(-0.2px);
+    }
+    :root:not([data-theme="dark"]) .themeIcon.moon{
+      opacity: 0.50;
+    }
+
+    /* Active icon: DARK => moon active */
+    :root[data-theme="dark"] .themeIcon.moon{
+      opacity: 0.95;
+      transform: translateY(-0.2px);
+    }
+    :root[data-theme="dark"] .themeIcon.sun{
+      opacity: 0.50;
+    }
+
+    .themeThumb{
+      position:absolute;
+      top: 50%;
+      transform: translateY(-50%);
+
+      width: var(--thumb);
+      height: var(--thumb);
+      border-radius: 999px;
+
+      left: calc(var(--toggle-pad) + var(--thumb-offset)); /* mặc định = LIGHT */
+      transition: left 180ms ease;
+
+      background: rgba(255,255,255,0.65);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.16);
+
+      z-index: 1;
+      pointer-events:none;
+    }
+
+    /* DARK: thumb sang nửa phải, đúng tâm icon moon */
+    :root[data-theme="dark"] .themeThumb{
+      left: calc(var(--toggle-pad) + var(--seg) + var(--thumb-offset));
+      background: rgba(236,230,221,0.22);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.42);
+    }
+
+    .thinkingText{
+      display:inline-block;
+      background:linear-gradient(
+        90deg,
+        #b79f7a 0%,
+        #9d8265 42%,
+        #a8927a 75%,
+        rgba(183,159,122,0.3) 100%
+      );
+      background-size:220% 100%;
+      color:#9d8265;
+      -webkit-background-clip:text;
+      background-clip:text;
+      -webkit-text-fill-color:transparent;
+      animation: thinkingShimmer 1.4s ease infinite;
+    }
+
+    @keyframes thinkingShimmer{
+      0%{ background-position:0 0; }
+      100%{ background-position:200% 0; }
+    }
+
+    :root[data-theme="dark"] .aiPlain{
+      color: #f1ebe3; /* Đảm bảo aiPlain có màu trong dark mode */
+    }
+
+    /* Dark mode styles cho Markdown */
+    :root[data-theme="dark"] .ai code{
+      background: rgba(255,255,255,0.1);
+      color: #e6dccf;
+    }
+
+    :root[data-theme="dark"] .ai pre{
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    :root[data-theme="dark"] .ai pre code{
+      background: transparent;
+    }
+
+    :root[data-theme="dark"] .ai blockquote{
+      border-left-color: rgba(255,255,255,0.3);
+      color: rgba(241,235,227,0.8);
+    }
+
+    :root[data-theme="dark"] .ai a{
+      color: #7cb3f0;
+    }
+
+    :root[data-theme="dark"] .ai a:hover{
+      color: #9cc5f5;
+    }
+
+    :root[data-theme="dark"] .ai table{
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    :root[data-theme="dark"] .ai th{
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    :root[data-theme="dark"] .ai td{
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    :root[data-theme="dark"] .thinkingText{
+      /* Gradient động cho dark mode */
+      background: linear-gradient(
+        90deg,
+        rgba(241,235,227,0.50) 0%,
+        rgba(241,235,227,0.85) 42%,
+        rgba(241,235,227,0.70) 75%,
+        rgba(241,235,227,0.30) 100%
+      );
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: thinkingShimmerDark 1.4s ease infinite;
+    }
+    
+    @keyframes thinkingShimmerDark{
+      0%{ background-position:0 0; }
+      100%{ background-position:200% 0; }
+    }
+
+    /* ===== Scrollbar styling (WebKit) ===== */
+    .scrollArea::-webkit-scrollbar{
+      width: 10px;
+    }
+
+    /* Ẩn scrollbar cho textarea input */
+    .chatComposerInput::-webkit-scrollbar{
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
+    .scrollArea::-webkit-scrollbar-track{
+      background: var(--sb-track);
+      border-radius: 999px;
+    }
+
+    .chatComposerInput::-webkit-scrollbar-track{
+      display: none;
+    }
+
+    .scrollArea::-webkit-scrollbar-thumb{
+      background: var(--sb-thumb);
+      border-radius: 999px;
+      border: 3px solid transparent;       /* tạo "pill" mảnh, tinh tế */
+      background-clip: content-box;
+    }
+
+    .chatComposerInput::-webkit-scrollbar-thumb{
+      display: none;
+    }
+
+    .scrollArea::-webkit-scrollbar-thumb:hover{
+      background: var(--sb-thumb-hover);
+      background-clip: content-box;
+    }
+
+    .chatComposerInput::-webkit-scrollbar-thumb:hover{
+      display: none;
+    }
+
+    /* ===== Scrollbar styling (Firefox) ===== */
+    .scrollArea{
+      scrollbar-width: thin;
+      scrollbar-color: var(--sb-thumb) var(--sb-track);
+    }
+
+    /* Ẩn scrollbar cho textarea (Firefox) */
+    .chatComposerInput{
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    /* ===== HTML scrollbar ===== */
+    html{
+      scrollbar-color: var(--sb-thumb) var(--sb-track);
+    }
+    html::-webkit-scrollbar{ width: 10px; }
+    html::-webkit-scrollbar-track{ background: var(--sb-track); }
+    html::-webkit-scrollbar-thumb{
+      background: var(--sb-thumb);
+      border-radius: 999px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    html::-webkit-scrollbar-thumb:hover{
+      background: var(--sb-thumb-hover);
+      background-clip: content-box;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <!-- Left: Clock -->
+    <div class="tbLeft">
+      <div id="clockWidget" class="clockWidget" aria-label="Clock">
+        <svg class="clockSvg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8" opacity="0.95"></circle>
+          <path class="clockHand" d="M12 12 L12 6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          <path d="M12 12 L16.2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.65"></path>
+        </svg>
+        <span id="clockTime">--:--:--</span>
+      </div>
+    </div>
+
+    <!-- Center: empty on purpose (no system log) -->
+    <div class="tbCenter" aria-hidden="true"></div>
+
+    <!-- Right: Cursor-like theme toggle -->
+    <div class="tbRight">
+      <button id="themeToggle" class="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+        <span class="themeThumb" aria-hidden="true"></span>
+
+        <!-- Sun (Lucide-like) -->
+        <svg class="themeIcon sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M12 2.3v2.2M12 19.5v2.2M4.5 12H2.3M21.7 12h-2.2
+                   M5.4 5.4l-1.6-1.6M20.2 20.2l-1.6-1.6
+                   M18.6 5.4l1.6-1.6M3.8 20.2l1.6-1.6"
+                stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+
+        <!-- Moon (Lucide-like) -->
+        <svg class="themeIcon moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M21 13.1A7.6 7.6 0 0 1 10.9 3.0
+                   a7.2 7.2 0 1 0 10.1 10.1Z"
+                stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Nếu bạn đang dùng kéo-resize topbar thì giữ lại -->
+    <div id="topbarResizer" class="topbarResizer" role="separator" aria-orientation="horizontal" aria-label="Resize topbar"></div>
+  </div>
+
+  <div class="app">
+    <div class="leftPane">
+      <div class="coming">
+        <div class="badge">Coming soon</div>
+        <h1>Workspace</h1>
+        <p>Phần workspace / sidebar để sau. Hiện tập trung làm chat panel.</p>
+      </div>
+    </div>
+
+    <aside class="chat">
+      <div id="chatResizer" class="chatResizer" role="separator" aria-orientation="vertical" aria-label="Resize chat"></div>
+      <div class="wrap">
+        <div class="scrollArea" id="scrollArea">
+          <div class="messages" id="messages">
+          </div>
+        </div>
+
+        <div class="bar">
+          <div class="chatComposer">
+            <textarea id="ta" class="chatComposerInput" placeholder="Nhập câu hỏi..." spellcheck="false"></textarea>
+
+            <button id="send" class="chatSend" type="button" aria-label="Send" disabled>
+              <svg class="sendIcon" viewBox="0 0 24 24" fill="none">
+                <path d="M4 12L20 4L13 20L11 13L4 12Z"
+                      stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+
+  <!-- Mount React với Clerk authentication -->
+  <script type="module" src="/src/main-clerk.jsx"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "models": [
+    {
+      "value": "gpt-4o-mini",
+      "label": "GPT-4o Mini",
+      "description": "Model nhanh và tiết kiệm chi phí"
+    },
+    {
+      "value": "gpt-5-mini",
+      "label": "GPT-5 Mini",
+      "description": "Model mới nhất, hiệu suất cao hơn"
+    }
+  ],
+  "default": "gpt-4o-mini"
+}

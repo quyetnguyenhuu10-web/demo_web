@@ -176,7 +176,7 @@ export default function ClerkWrapper({ children, publishableKey }) {
   
   if (!clerkKey) {
     // Không có Clerk key - render app trực tiếp không có authentication
-    console.warn("⚠️ ClerkWrapper: Missing publishableKey - running in no-auth mode");
+    // Không log warning để tránh spam console
     return <>{children}</>;
   }
 

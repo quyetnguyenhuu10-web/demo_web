@@ -36,8 +36,8 @@ function init() {
     document.body.appendChild(rootEl);
   }
 
-  // Luôn render với ClerkWrapper để SidebarMenu có thể dùng Clerk hooks
-  // ClerkWrapper sẽ xử lý trường hợp không có key bằng dummy key
+  // Luôn render với ClerkWrapper
+  // ClerkWrapper sẽ xử lý trường hợp không có key bằng cách render app trực tiếp (không có ClerkProvider)
   const root = createRoot(rootEl);
   root.render(
     <StrictMode>

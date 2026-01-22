@@ -1221,16 +1221,22 @@
 
     /* ========== Code Block SSOT (Light + Dark) ========== */
     :root{
-      --code-bg: #ffffff;              /* VS Code Light+ surface */
-      --code-border: #e5e5e5;
-      --code-header-bg: #f6f6f6;
-      --code-header-fg: #333;
+      /* Code block - Light mode (VS Code Light+) */
+      --code-bg: #ffffff;              /* Nền trắng */
+      --code-border: #e5e5e5;          /* Viền xám nhẹ */
+      --code-header-bg: #f6f6f6;       /* Header xám nhẹ */
+      --code-header-fg: #333;          /* Chữ tối (không phải trắng) */
       --code-copy-bg: transparent;
-      --code-copy-fg: #333;
+      --code-copy-fg: #333;            /* Chữ tối (không phải trắng) */
+      /* Syntax colors - màu tối để đọc được trên nền sáng */
+      --code-text: #1e1e1e;            /* Chữ code base - đen/tối, không phải trắng */
+      --code-comment: #6a9955;         /* Comment - xanh lá nhạt */
+      --code-keyword: #0000ff;         /* Keyword - xanh dương */
+      --code-string: #a31515;          /* String/literal - đỏ */
     }
 
     :root[data-theme="dark"]{
-      /* Code block - ĐEN HẲN, đúng tông */
+      /* Code block - Dark mode - ĐEN HẲN, đúng tông */
       --code-bg: #141210;              /* Đen ấm, cùng hệ với panel/chat */
       --code-border: rgba(255,255,255,0.10); /* Viền nhẹ, chỉ để tách khối */
       --code-header-bg: #121110;       /* Header đậm hơn 1 nấc */
@@ -1322,7 +1328,42 @@
 
     .codeBlock pre code{
       background: transparent !important;
-      color: var(--code-text, #ECE6DD) !important; /* Chữ code base */
+      color: var(--code-text) !important; /* Chữ code base - tối cho light, sáng cho dark */
+    }
+    
+    /* Đảm bảo text trong code block light mode không phải màu trắng */
+    :root:not([data-theme="dark"]) .codeBlock pre code {
+      color: var(--code-text, #1e1e1e) !important; /* Màu tối, không phải trắng */
+    }
+    
+    /* Text trong code block dark mode */
+    :root[data-theme="dark"] .codeBlock pre code {
+      color: var(--code-text, #ECE6DD) !important; /* Màu sáng cho dark mode */
+    }
+
+    /* Override syntax highlighting colors cho light mode - màu tối, không phải trắng */
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.comment,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.prolog,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.doctype,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.cdata {
+      color: var(--code-comment, #6a9955) !important; /* Xanh lá nhạt - màu tối */
+    }
+
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.keyword,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.selector,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.attr-name,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.property,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.class-name,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.function {
+      color: var(--code-keyword, #0000ff) !important; /* Xanh dương - màu tối */
+    }
+
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.string,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.char,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.attr-value,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.regex,
+    :root:not([data-theme="dark"]) .codeBlock pre code .token.variable {
+      color: var(--code-string, #a31515) !important; /* Đỏ - màu tối */
     }
 
     /* Override syntax highlighting colors cho dark mode */

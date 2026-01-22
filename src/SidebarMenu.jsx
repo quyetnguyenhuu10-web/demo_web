@@ -102,13 +102,11 @@ function ClerkSidebarMenu() {
 
 // Component khi không có Clerk (không dùng hooks)
 function NoAuthSidebarMenu() {
+  // Không hiển thị gì khi không có Clerk - sidebar trống
   return (
     <div className="sidebarMenu">
-      <div className="sidebarAuthSection">
-        <div className="sidebarAuthHeader">
-          <h2 className="sidebarAuthTitle">Authentication</h2>
-          <p className="sidebarAuthSubtitle">Clerk authentication is not configured.</p>
-        </div>
+      <div className="sidebarListSection">
+        {/* Sidebar trống khi không có Clerk */}
       </div>
     </div>
   );

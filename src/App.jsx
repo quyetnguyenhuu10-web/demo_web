@@ -50,6 +50,7 @@ const CodeBlock = memo(function CodeBlock({ language, value, isDark }) {
     background: "transparent",
   }), []);
 
+  // Dùng vs cho light mode, vscDarkPlus cho dark mode
   const syntaxStyle = useMemo(() => 
     isDark ? vscDarkPlus : vs, 
     [isDark]
@@ -570,8 +571,10 @@ export default function App() {
     loadModels();
   }, []);
 
-  // Kiểm tra readonly state
-  const { isReadOnly } = checkAuthorization(user) || { isReadOnly: false };
+  // Kiểm tra readonly state và pending state
+  const authState = checkAuthorization(user) || { isReadOnly: false, state: 'unauthenticated' };
+  const { isReadOnly, state: authStateType } = authState;
+  const isPending = authStateType === 'pending';
 
   // Toast state
   const [toast, setToast] = useState(null);
@@ -674,7 +677,11 @@ export default function App() {
 
   const createJob = async (message) => {
     // Gatekeeping: Kiểm tra authorization trước khi gọi API
-    requireAuthorization(user);
+    try {
+      requireAuthorization(user);
+    } catch (err) {
+      throw err; // Re-throw để streamJob xử lý
+    }
 
     // Lấy Clerk token để gửi kèm request
     let token = null;
@@ -918,9 +925,13 @@ export default function App() {
       requireAuthorization(user);
     } catch (err) {
       setStatusDom("error");
+      // Hiển thị thông báo thân thiện hơn cho pending approval
+      const errorMsg = err.message.includes('PENDING_APPROVAL') 
+        ? "⏳ Tài khoản của bạn đang chờ phê duyệt. Vui lòng liên hệ quản trị viên."
+        : err.message;
       setToast({
-        message: err.message,
-        duration: 3000,
+        message: errorMsg,
+        duration: 4000,
       });
       return;
     }
@@ -1565,7 +1576,7 @@ export default function App() {
                       localStorage.setItem(MODEL_STORAGE_KEY, model);
                     }
                   }}
-                  disabled={status === "creating" || status === "streaming" || isReadOnly || availableModels.length === 0}
+                  disabled={status === "creating" || status === "streaming" || isReadOnly || isPending || availableModels.length === 0}
                 />
               </div>
               
@@ -1573,10 +1584,11 @@ export default function App() {
                 <textarea
                   id="ta"
                   className="chatComposerInput"
-                  placeholder="Nhập câu hỏi..."
+                  placeholder={isPending ? "Đang chờ phê duyệt..." : "Nhập câu hỏi..."}
                   spellCheck="false"
                   value={input}
                   rows={1}
+                  disabled={isPending || isReadOnly}
                   style={{ 
                     minHeight: "24px",
                     maxHeight: "150px",
@@ -1632,7 +1644,7 @@ export default function App() {
                   className="chatSend"
                   type="button"
                   aria-label="Send"
-                  disabled={status === "creating" || status === "streaming" || input.trim().length === 0}
+                  disabled={status === "creating" || status === "streaming" || input.trim().length === 0 || isPending || isReadOnly}
                   onClick={sendMessage}
                 >
                   <svg className="sendIcon" viewBox="0 0 24 24" fill="none">

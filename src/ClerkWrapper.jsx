@@ -73,15 +73,25 @@ function AuthorizationGate({ children }) {
     return null; // Clerk sẽ handle
   }
 
-  // State 1: Pending Approval
+  // State 1: Pending Approval - hiển thị modal overlay, không ẩn app
   if (state === 'pending') {
     return (
       <>
         <style>{`
-          .app { display: none !important; }
-          .topbar { display: none !important; }
+          /* Đảm bảo React elements hiển thị */
+          .app[data-react="true"] { 
+            display: flex !important; 
+          }
+          .topbar[data-react="true"] { 
+            display: grid !important; 
+          }
+          .chat[data-react="true"] {
+            display: flex !important;
+          }
         `}</style>
+        {/* Hiển thị modal pending approval nhưng vẫn cho phép xem web */}
         <PendingApproval />
+        {children}
       </>
     );
   }

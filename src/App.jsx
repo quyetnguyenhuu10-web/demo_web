@@ -446,14 +446,35 @@ const DEFAULT_MODELS = [
 const MODEL_STORAGE_KEY = "ai_agent_selected_model";
 
 export default function App() {
-  const { user, getToken: getTokenFromHook } = useUser(); // Clerk hooks
+  // Safe Clerk hook: allow running without ClerkProvider
+  let user = null;
+  let getTokenFromHook = null;
+  try {
+    const userHook = useUser();
+    user = userHook.user;
+    getTokenFromHook = userHook.getToken;
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.warn("⚠️ ClerkProvider missing. Running in no-auth mode.");
+    }
+  }
+
   // Fallback getToken function
-  const getToken = getTokenFromHook || (typeof window !== "undefined" && window.__CLERK_GET_TOKEN__ 
-    ? async () => await window.__CLERK_GET_TOKEN__() 
+  const getToken = getTokenFromHook || (typeof window !== "undefined" && window.__CLERK_GET_TOKEN__
+    ? async () => await window.__CLERK_GET_TOKEN__()
     : async () => null);
+  
   const [status, setStatus] = useState("ready"); // ready | creating | streaming | error
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState([]);
+  
+  // Debug: Log khi component mount (chỉ log một lần)
+  useEffect(() => {
+    const theme = document.documentElement.getAttribute("data-theme");
+    if (theme === "dark") {
+      console.log("💡 [INFO] UI đang ở chế độ DARK. Click nút theme toggle (☀️/🌙) để đổi sang LIGHT.");
+    }
+  }, []);
   
   // useEffect để tự động reset textarea về kích thước ban đầu khi input empty
   // Chạy ngay khi input thay đổi thành empty
@@ -832,10 +853,17 @@ export default function App() {
 
   // Khởi tạo theme ngay khi component mount
   useEffect(() => {
+    // FORCE light mode để tránh UI tối om (user có thể đổi bằng nút toggle)
     const THEME_KEY = "ui_theme";
-    // Patch C: Mặc định light (không theo system theme)
     const saved = localStorage.getItem(THEME_KEY);
-    const theme = saved === "dark" || saved === "light" ? saved : "light";
+    let theme = "light"; // Mặc định light
+    if (saved === "light") {
+      theme = "light";
+    } else if (saved === "dark") {
+      // Force light để tránh tối om
+      theme = "light";
+      localStorage.setItem(THEME_KEY, "light"); // Update localStorage
+    }
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
   
@@ -1229,7 +1257,7 @@ export default function App() {
   return (
     <>
       {/* React App */}
-      <div className="topbar">
+      <div className="topbar" data-react="true">
         {/* Left: Clock */}
         <div className="tbLeft">
           <div id="clockWidget" className="clockWidget" aria-label="Clock">
@@ -1286,7 +1314,7 @@ export default function App() {
         <div id="topbarResizer" className="topbarResizer" role="separator" aria-orientation="horizontal" aria-label="Resize topbar"></div>
       </div>
 
-      <div className="app">
+      <div className="app" data-react="true">
         <div className="leftPane">
           <div className="coming">
             <div className="badge">Coming soon</div>
@@ -1295,7 +1323,7 @@ export default function App() {
           </div>
         </div>
 
-        <aside className="chat">
+        <aside className="chat" data-react="true">
           <div id="chatResizer" className="chatResizer" role="separator" aria-orientation="vertical" aria-label="Resize chat"></div>
           <div className="wrap">
             <div

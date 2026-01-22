@@ -29,8 +29,10 @@ function AuthorizationGate({ children }) {
     return (
       <>
         <style>{`
+          /* Đảm bảo React elements hiển thị khi đang load */
           .app[data-react="true"] { display: flex !important; }
           .topbar[data-react="true"] { display: grid !important; }
+          .chat[data-react="true"] { display: flex !important; }
         `}</style>
         {/* Hiển thị app ngay, chỉ có overlay loading nhẹ */}
         {children}
@@ -145,14 +147,17 @@ function AuthorizationGate({ children }) {
     return (
       <>
         <style>{`
-          .app[data-react="true"] { display: flex !important; }
-          .topbar[data-react="true"] { display: grid !important; }
-          #clerk-root { 
-            position: static !important;
-            width: 100% !important;
-            height: 100% !important;
+          /* Đảm bảo React elements hiển thị */
+          .app[data-react="true"] { 
+            display: flex !important; 
           }
-          /* Ẩn HTML tĩnh */
+          .topbar[data-react="true"] { 
+            display: grid !important; 
+          }
+          .chat[data-react="true"] {
+            display: flex !important;
+          }
+          /* Ẩn HTML tĩnh nếu có (không nên có nữa) */
           .topbar:not([data-react="true"]),
           .app:not([data-react="true"]) {
             display: none !important;
@@ -174,13 +179,8 @@ export default function ClerkWrapper({ children, publishableKey }) {
   const clerkKey = String(publishableKey || "").trim();
   
   if (!clerkKey) {
-    console.warn("⚠️ ClerkWrapper: Missing publishableKey prop");
+    console.warn("⚠️ ClerkWrapper: Missing publishableKey prop - returning children directly");
     return <>{children}</>;
-  }
-
-  // Chỉ log khi debug
-  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_CLERK === "true") {
-    console.log("✅ ClerkWrapper: Initializing with key: [CONFIGURED]");
   }
 
   return (

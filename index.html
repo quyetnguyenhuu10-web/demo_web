@@ -14,12 +14,26 @@
       const root = document.documentElement;
       
       try {
-        // 1. Apply theme trước - Patch B: mặc định light (không theo system)
+        // 1. Apply theme trước - FORCE light mode mặc định để tránh UI tối om
         const THEME_KEY = "ui_theme";
         const saved = localStorage.getItem(THEME_KEY);
-        // Mặc định light mode để tránh UI tối om khi chưa có React render
-        const theme = saved === "dark" || saved === "light" ? saved : "light";
+        // FORCE light mode nếu chưa có hoặc đang là dark (để tránh tối om)
+        // User có thể đổi lại sau bằng nút toggle
+        let theme = "light";
+        if (saved === "light") {
+          theme = "light"; // Giữ light nếu user đã chọn
+        } else if (saved === "dark") {
+          // Nếu đang dark, vẫn set light để tránh tối om
+          // User có thể đổi lại bằng nút toggle nếu muốn
+          theme = "light";
+          // Option: uncomment dòng dưới nếu muốn giữ dark mode
+          // theme = "dark";
+        }
         root.setAttribute("data-theme", theme);
+        // Update localStorage để đồng bộ
+        if (localStorage.getItem(THEME_KEY) !== theme) {
+          localStorage.setItem(THEME_KEY, theme);
+        }
         
         // 2. Apply topbar height từ ideal (rem) - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
         const TOPBAR_IDEAL_KEY = "ui_topbar_ideal_rem";

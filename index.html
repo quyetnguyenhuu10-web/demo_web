@@ -3,11 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Agent – Chat</title>
-  
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <title>web_ui – Chat (Standalone)</title>
 
   <!-- CRITICAL: Apply theme và kích thước TRƯỚC khi CSS render -->
   <!-- Script này PHẢI chạy trước <style> tag để set CSS variables ngay -->
@@ -18,26 +14,12 @@
       const root = document.documentElement;
       
       try {
-        // 1. Apply theme trước - FORCE light mode mặc định để tránh UI tối om
+        // 1. Apply theme trước
         const THEME_KEY = "ui_theme";
         const saved = localStorage.getItem(THEME_KEY);
-        // FORCE light mode nếu chưa có hoặc đang là dark (để tránh tối om)
-        // User có thể đổi lại sau bằng nút toggle
-        let theme = "light";
-        if (saved === "light") {
-          theme = "light"; // Giữ light nếu user đã chọn
-        } else if (saved === "dark") {
-          // Nếu đang dark, vẫn set light để tránh tối om
-          // User có thể đổi lại bằng nút toggle nếu muốn
-          theme = "light";
-          // Option: uncomment dòng dưới nếu muốn giữ dark mode
-          // theme = "dark";
-        }
+        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved === "dark" || saved === "light" ? saved : (systemDark ? "dark" : "light");
         root.setAttribute("data-theme", theme);
-        // Update localStorage để đồng bộ
-        if (localStorage.getItem(THEME_KEY) !== theme) {
-          localStorage.setItem(THEME_KEY, theme);
-        }
         
         // 2. Apply topbar height từ ideal (rem) - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
         const TOPBAR_IDEAL_KEY = "ui_topbar_ideal_rem";
@@ -100,7 +82,7 @@
   <!-- CSS chính - script trên đã set inline style cho CSS variables -->
   <style>
     :root{
-      /* Warm paper base - Light mode default */
+      /* Warm paper base */
       --bg: #f5f1ea;         /* nền chính: giấy ấm */
       --bg-soft: #f7f3ed;    /* pane trái */
       --pane: #f1ece4;
@@ -165,6 +147,20 @@
       --clock-border: rgba(212,183,124,0.45);
       --clock-glass: rgba(212,183,124,0.18);
 
+      /* Model selector accent (champagne gold) */
+      --model-accent: rgba(212,183,124,0.22);
+      --model-accent-border: rgba(212,183,124,0.35);
+      --model-accent-ring: rgba(212,183,124,0.20);
+      --model-accent-hover: rgba(212,183,124,0.12);
+      /* Model selector background: solid, không trong suốt - nâu đen sâu cho light mode */
+      --model-bg: #e8dcc8; /* Nâu đen sâu, nghiêng về nâu cho light mode */
+      --model-bg-hover: #e0d2bc; /* Hover đậm hơn một chút */
+      /* Tick color: deep dark cho light mode */
+      --model-tick: #1c1a17;
+      /* Hover text color: giảm độ sáng 40% - beige-gold tối hơn */
+      --model-hover-text: #52432f; /* Beige-gold giảm độ sáng 40% từ #8a6f52 */
+      --model-hover-shadow: 0 1px 2px #3d3225, 0 0 4px #4a3d2b;
+
       /* ===== Scrollbar (LIGHT) ===== */
       --sb-track: rgba(28,26,23,0.06);
       --sb-thumb: rgba(28,26,23,0.22);
@@ -225,6 +221,20 @@
       --clock-border: rgba(159,183,166,0.40);
       --clock-glass: rgba(159,183,166,0.14);
 
+      /* Model selector accent (sage) */
+      --model-accent: rgba(159,183,166,0.18);
+      --model-accent-border: rgba(159,183,166,0.32);
+      --model-accent-ring: rgba(159,183,166,0.24);
+      --model-accent-hover: rgba(159,183,166,0.10);
+      /* Model selector background: solid, không trong suốt - nâu đen sâu, nghiêng nâu */
+      --model-bg: #1a1512; /* Nâu đen sâu, nghiêng về nâu */
+      --model-bg-hover: #1f1915; /* Hover sáng hơn một chút */
+      /* Tick color: warm white cho dark mode */
+      --model-tick: #ece6dd;
+      /* Hover text color: giảm độ sáng 40% - sage tối hơn */
+      --model-hover-text: #658a7a; /* Sage giảm độ sáng 40% từ #a8c5b3 */
+      --model-hover-shadow: 0 1px 3px #4d6b5d, 0 0 6px #5a7a6a;
+
       /* ===== Scrollbar (DARK) ===== */
       --sb-track: rgba(236,230,221,0.06);
       --sb-thumb: rgba(236,230,221,0.22);
@@ -241,18 +251,30 @@
     }
 
     body{
-      background:var(--bg, #f5f1ea); /* Fallback sáng nếu CSS chưa load */
+      background:var(--bg);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      color:var(--text, #1c1a17); /* Fallback text color */
+      color:var(--text);
       overflow:hidden;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
     
-    /* Đảm bảo #root có background nếu React chưa render */
+    /* Đảm bảo #root hiển thị và fill viewport */
     #root {
-      background:var(--bg, #f5f1ea);
-      min-height: 100%;
+      height: 100%;
+      width: 100%;
+      display: block !important;
+    }
+    
+    /* Đảm bảo UI elements hiển thị (backup rule) */
+    .app[data-react="true"] { 
+      display: flex !important; 
+    }
+    .topbar[data-react="true"] { 
+      display: grid !important; 
+    }
+    .chat[data-react="true"] {
+      display: flex !important;
     }
 
     /* ===== Topbar layout: clean (no system log) ===== */
@@ -574,7 +596,8 @@
       contain: layout style; /* Optimize rendering */
     }
 
-    /* Model selector wrapper */
+    /* ===== Model Selector - Glass Pill (Hướng A) ===== */
+    /* Wrapper cho model pill với caret */
     .modelSelectorWrapper{
       position: relative;
       display: inline-flex !important;
@@ -583,51 +606,48 @@
       opacity: 1 !important;
     }
 
-    /* Model selector - style như button với dropdown */
+    /* Model selector - Glass pill đồng bộ topbar */
     .modelSelector{
       appearance: none;
       -webkit-appearance: none;
       -moz-appearance: none;
-      padding: 6px 28px 6px 10px;
-      border-radius: 6px;
-      border: none;
-      background: rgba(28, 26, 23, 0.08);
-      color: var(--text, #1c1a17);
-      font-size: 0.8125rem;
-      font-weight: 500;
+
+      height: var(--topbar-pill-h, 20px);
+      padding: 0 28px 0 12px;          /* chừa chỗ cho caret */
+      border-radius: 8px;               /* Bo tròn nhẹ hơn */
+
+      border: 1px solid var(--topbar-border);
+      background: var(--model-bg); /* Màu solid, không trong suốt */
+      color: var(--topbar-fg);
+
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+
       cursor: pointer;
+      user-select: none;
+
+      box-shadow: none;
       outline: none;
-      font-family: inherit;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", "Roboto", system-ui, sans-serif;
       transition: background 0.2s ease;
       min-width: 120px;
-      height: 28px;
       line-height: 1;
-      display: block !important; /* Đảm bảo hiển thị */
+      display: block !important;
       visibility: visible !important;
       opacity: 1 !important;
       z-index: 10;
     }
 
-    /* Dropdown arrow - chỉ hiển thị khi dùng select element (không dùng với custom dropdown) */
-    .modelSelectorWrapper::after{
-      content: "▼";
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      pointer-events: none;
-      font-size: 0.7rem;
-      color: var(--muted, #6c625a);
-      opacity: 0.7;
-    }
-    
-    /* Ẩn ::after khi dùng custom dropdown */
-    .modelSelectorWrapper.hasCustomDropdown::after {
-      display: none;
+    /* Hover: màu solid đậm hơn, không trong suốt */
+    .modelSelector:hover:not(:disabled) {
+      background: var(--model-bg-hover);
+      border-color: var(--topbar-border);
     }
 
-    .modelSelector:hover:not(:disabled){
-      background: rgba(28, 26, 23, 0.12);
+    /* Focus: ring mềm với màu accent */
+    .modelSelector:focus-visible {
+      box-shadow: 0 0 0 3px var(--model-accent-ring);
     }
 
     .modelSelector:disabled{
@@ -635,32 +655,33 @@
       cursor: not-allowed;
     }
 
-    .modelSelector:focus{
-      background: rgba(28, 26, 23, 0.12);
+    /* Caret (wrap trong container) */
+    .modelSelectorWrapper::after{
+      content: "▾";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-52%);
+      pointer-events: none;
+      font-size: 11px;
+      opacity: 0.75;
+      color: var(--topbar-fg);
+    }
+    
+    /* Ẩn ::after khi dùng custom dropdown */
+    .modelSelectorWrapper.hasCustomDropdown::after {
+      display: none;
     }
 
-    /* Dark mode */
-    :root[data-theme="dark"] .modelSelector{
-      background: rgba(236, 230, 221, 0.08);
-      color: var(--text, #ece6dd);
-    }
+    /* Dark mode - dùng CSS variables tự động, không cần override riêng */
 
-    :root[data-theme="dark"] .modelSelector:hover:not(:disabled){
-      background: rgba(236, 230, 221, 0.12);
-    }
-
-    :root[data-theme="dark"] .modelSelector:focus{
-      background: rgba(236, 230, 221, 0.12);
-    }
-
-    :root[data-theme="dark"] .modelSelectorWrapper::after{
-      color: var(--muted, #9ca3af);
-    }
-
-    /* Custom dropdown list styles */
+    /* Custom dropdown list styles - đồng nhất với theme */
     .modelDropdownList {
       scrollbar-width: thin;
       scrollbar-color: var(--sb-thumb) var(--sb-track);
+      background: var(--model-bg); /* Màu solid, không trong suốt */
+      border: 1px solid var(--topbar-border);
+      color: var(--topbar-fg);
     }
 
     .modelDropdownList::-webkit-scrollbar {
@@ -681,24 +702,8 @@
       background: var(--sb-thumb-hover);
     }
 
-    /* Dark mode cho dropdown list */
-    :root[data-theme="dark"] .modelDropdownList {
-      background: var(--panel, #141210);
-      border-color: var(--border, rgba(236,230,221,0.10));
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.35);
-    }
-
-    :root[data-theme="dark"] .modelDropdownList button {
-      color: var(--text, #ece6dd);
-    }
-
-    :root[data-theme="dark"] .modelDropdownList button:hover {
-      background: rgba(236,230,221,0.08) !important;
-    }
-
-    :root[data-theme="dark"] .modelDropdownList button[style*="rgba(28,26,23,0.08)"] {
-      background: rgba(236,230,221,0.12) !important;
-    }
+    /* Dark mode cho dropdown list - dùng CSS variables tự động, không cần override riêng */
+    /* CSS variables đã tự động thay đổi theo theme */
 
     .chatComposer:focus-within{
       border-color: var(--border-soft);
@@ -1015,7 +1020,8 @@
       color: #f1ebe3; /* Đảm bảo aiPlain có màu trong dark mode */
     }
 
-    /* Dark mode styles cho Markdown */
+    /* Dark mode styles cho Markdown - COMMENTED: sẽ dùng VS Code theme thay thế */
+    /* 
     :root[data-theme="dark"] .ai code{
       background: rgba(255,255,255,0.1);
       color: #e6dccf;
@@ -1029,6 +1035,7 @@
     :root[data-theme="dark"] .ai pre code{
       background: transparent;
     }
+    */
 
     :root[data-theme="dark"] .ai blockquote{
       border-left-color: rgba(255,255,255,0.3);
@@ -1146,10 +1153,135 @@
       background: var(--sb-thumb-hover);
       background-clip: content-box;
     }
+
+    /* =========================================================
+       Code Block SSOT (Light + Dark) - VS Code theme
+       ========================================================= */
+
+    /* CRITICAL: Đảm bảo UI chính luôn hiển thị */
+    .app[data-react="true"] { 
+      display: flex !important; 
+    }
+    .topbar[data-react="true"] { 
+      display: grid !important; 
+    }
+    .chat[data-react="true"] {
+      display: flex !important;
+    }
+
+    /* ========== Code Block SSOT (Light + Dark) ========== */
+    :root{
+      --code-bg: #ffffff;              /* VS Code Light+ surface */
+      --code-border: #e5e5e5;
+      --code-header-bg: #f6f6f6;
+      --code-header-fg: #333;
+      --code-copy-bg: transparent;
+      --code-copy-fg: #333;
+    }
+
+    :root[data-theme="dark"]{
+      --code-bg: #1e1e1e;              /* VS Code Dark+ surface */
+      --code-border: #333;
+      --code-header-bg: #252526;
+      --code-header-fg: #d4d4d4;
+      --code-copy-bg: transparent;
+      --code-copy-fg: #d4d4d4;
+    }
+
+    /* Wrapper của code block */
+    .codeBlock{
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 12px;
+      overflow: visible;
+      box-shadow: none;
+    }
+
+    /* Header (PYTHON + Copy) phải cùng "hệ màu" */
+    .codeBlockHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 10px 12px;
+      background: var(--code-header-bg);
+      color: var(--code-header-fg);
+      border-bottom: 1px solid var(--code-border);
+      position: relative;
+      z-index: 10;
+    }
+
+    .codeLangTag{
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0.9;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(127,127,127,0.12);
+    }
+
+    .codeCopyBtn{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 0;
+      background: var(--code-copy-bg);
+      color: var(--code-copy-fg);
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 8px;
+      position: relative;
+      z-index: 11;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .codeCopyBtn:hover{
+      background: rgba(127,127,127,0.12);
+    }
+    .codeCopyBtn:active{
+      transform: scale(0.98);
+    }
+
+    /* Ép pre/code đồng nhất nền (quan trọng) */
+    .codeBlock pre{
+      margin: 0 !important;
+      background: var(--code-bg) !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+
+    .codeBlock pre code{
+      background: transparent !important;
+    }
+
+    /* Inline code (không phải block) */
+    .ai :not(pre) > code{
+      background: rgba(127,127,127,0.14) !important;
+      border: 1px solid rgba(127,127,127,0.18);
+      border-radius: 6px;
+      padding: 0.15em 0.35em;
+    }
+
+    /* Bỏ scroll hoàn toàn - code hiển thị đầy đủ */
+    .codeBlock pre {
+      overflow: visible !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+    .codeBlock pre::-webkit-scrollbar { 
+      display: none;
+    }
   </style>
 </head>
 
 <body>
+  <!-- React sẽ render toàn bộ UI vào #root -->
   <div id="root"></div>
   <script type="module" src="/src/main-clerk.jsx"></script>
 </body>

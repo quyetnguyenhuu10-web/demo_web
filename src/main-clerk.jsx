@@ -1,79 +1,60 @@
-// main-clerk.jsx - Entry point với Clerk (SSOT mount)
+// main-clerk.jsx - Entry point với Clerk
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css"; // Import CSS để Vite inject vào
 import ClerkWrapper from "./ClerkWrapper.jsx";
 import App from "./App.jsx";
 
+// Tạo wrapper để mount Clerk UI + React App
 function AppWrapper({ clerkKey }) {
   return (
     <ClerkWrapper publishableKey={clerkKey}>
+      {/* Mount React App component */}
       <App />
     </ClerkWrapper>
   );
 }
 
+// Initialize function
 function init() {
-  try {
-    // Đảm bảo theme được set trước khi render - FORCE light để tránh tối om
-    const THEME_KEY = "ui_theme";
-    const saved = localStorage.getItem(THEME_KEY);
-    // FORCE light mode mặc định (user có thể đổi bằng nút toggle)
-    let theme = "light";
-    if (saved === "light") {
-      theme = "light";
-    } else if (saved === "dark") {
-      // Nếu đang dark, vẫn force light để tránh tối om
-      theme = "light";
-      localStorage.setItem(THEME_KEY, "light"); // Update localStorage
-    }
-    document.documentElement.setAttribute("data-theme", theme);
+  // Kiểm tra xem có Clerk key không
+  // Đọc trực tiếp từ import.meta.env để tránh cache issues
+  const clerkKey = String(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "").trim();
 
-    const clerkKey = String(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "").trim();
-    const rootEl = document.getElementById("root");
+  // Chỉ log khi cần debug (có thể tắt bằng cách comment)
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_CLERK === "true") {
+    console.log("🔍 Checking Clerk configuration...");
+    console.log("  - VITE_CLERK_PUBLISHABLE_KEY:", clerkKey ? "[CONFIGURED]" : "❌ NOT FOUND");
+  }
 
-    if (!rootEl) {
-      console.error("❌ Missing #root in index.html");
-      // Fallback: tạo root và thử lại
-      const fallbackRoot = document.createElement("div");
-      fallbackRoot.id = "root";
-      document.body.appendChild(fallbackRoot);
-      console.warn("⚠️ Created #root as fallback");
-      return init();
-    }
+  // Tìm hoặc tạo root element
+  let rootEl = document.getElementById("root");
+  if (!rootEl) {
+    // Nếu không có #root, tạo mới
+    rootEl = document.createElement("div");
+    rootEl.id = "root";
+    document.body.appendChild(rootEl);
+  }
 
-    // Nếu không có clerkKey thì render App trực tiếp (no-auth mode)
-    const node = clerkKey
-      ? <AppWrapper clerkKey={clerkKey} />
-      : <App />;
-
+  if (!clerkKey) {
+    console.warn("⚠️ Clerk Publishable Key chưa được cấu hình. Chạy app không có authentication.");
+    // Render App trực tiếp (không có Clerk)
     const root = createRoot(rootEl);
     root.render(
       <StrictMode>
-        {node}
+        <App />
       </StrictMode>
     );
-    
-  } catch (error) {
-    console.error("❌ Failed to initialize app:", error);
-    // Show error on screen
-    const rootEl = document.getElementById("root");
-    if (rootEl) {
-      rootEl.innerHTML = `
-        <div style="padding: 2rem; text-align: center; color: #ff4444; background: #fff;">
-          <h1>❌ Error loading app</h1>
-          <p>${error.message}</p>
-          <pre style="text-align: left; margin-top: 1rem;">${error.stack}</pre>
-          <p>Check browser console for details.</p>
-        </div>
-      `;
-    }
+  } else {
+    // Render với Clerk
+    const root = createRoot(rootEl);
+    root.render(
+      <StrictMode>
+        <AppWrapper clerkKey={clerkKey} />
+      </StrictMode>
+    );
   }
 }
 
-// Chạy khi DOM ready
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
-}
+// Chạy init
+init();

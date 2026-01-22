@@ -6,16 +6,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Debug: Log khi CSS được load */
-
-/* PATCH 3A: Reset Vite template CSS - không can thiệp layout */
-#root {
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  text-align: initial;
-}
-
 /* FORCE: dùng đúng theme variables (SSOT) */
 html, body, #root {
   height: 100%;
@@ -25,21 +15,12 @@ html, body, #root {
 }
 
 body {
-  /* FORCE light background - override dark theme để tránh tối om */
-  background: #f5f1ea !important; /* Light mode background - FORCE */
-  color: #1c1a17 !important; /* Light mode text - FORCE */
+  background: var(--bg, #f5f1ea) !important;
+  color: var(--text, #1c1a17) !important;
   overflow: hidden;
 }
 
-/* Đảm bảo #root có background sáng nếu React chưa render */
 #root {
-  background: #f5f1ea !important; /* Light mode background - FORCE */
-  min-height: 100vh;
-}
-
-/* Chỉ dùng CSS variables khi theme đã được set đúng */
-:root[data-theme="light"] body,
-:root[data-theme="light"] #root {
   background: var(--bg, #f5f1ea) !important;
-  color: var(--text, #1c1a17) !important;
+  min-height: 100vh;
 }

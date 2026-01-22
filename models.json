@@ -6,10 +6,9 @@
       "description": "Model nhanh và tiết kiệm chi phí"
     },
     {
-      "value": "gpt-5-mini",
-      "label": "GPT-5 Mini",
+      "value": "gpt-5-nano",
+      "label": "GPT-5 Nano",
       "description": "Model mới nhất, hiệu suất cao hơn"
     }
-  ],
-  "default": "gpt-4o-mini"
+  ]
 }

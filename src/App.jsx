@@ -1,14 +1,89 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useUser } from "@clerk/clerk-react";
 import { UI_CONFIG, buildApiUrl, buildApiHeaders, buildStreamUrl } from "./config.js";
 import { requireAuthorization, checkAuthorization } from "./auth-utils.js";
 import Toast from "./Toast.jsx";
 
 const FOLLOW_BOTTOM_THRESHOLD_PX = 140;
+
+// CodeBlock component với wrapper chuẩn (header + pre đồng nền)
+// Memoize để tránh re-render không cần thiết
+const CodeBlock = memo(function CodeBlock({ language, value, isDark }) {
+  const [copied, setCopied] = useState(false);
+  const lang = useMemo(() => (language || "").toUpperCase() || "CODE", [language]);
+
+  // Memoize onCopy handler để tránh re-render
+  const onCopy = useCallback(async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try { 
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  }, [value]);
+
+  // Memoize style để tránh re-render SyntaxHighlighter
+  const customStyle = useMemo(() => ({
+    background: "var(--code-bg)",
+    margin: 0,
+    padding: "12px 14px",
+    borderRadius: 0,
+    boxShadow: "none",
+    overflow: "visible",
+    overflowX: "visible",
+    overflowY: "visible",
+    maxHeight: "none",
+    height: "auto",
+  }), []);
+
+  const codeTagStyle = useMemo(() => ({
+    background: "transparent",
+  }), []);
+
+  const syntaxStyle = useMemo(() => 
+    isDark ? vscDarkPlus : vs, 
+    [isDark]
+  );
+
+  return (
+    <div className="codeBlock">
+      <div className="codeBlockHeader">
+        <span className="codeLangTag">{lang}</span>
+        <button 
+          className="codeCopyBtn" 
+          type="button" 
+          onClick={onCopy}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {copied ? "✓ Copied" : "Copy"}
+        </button>
+      </div>
+
+      <SyntaxHighlighter
+        language={(language || "").toLowerCase()}
+        style={syntaxStyle}
+        showLineNumbers={false}
+        wrapLongLines={true}
+        wrapLines={true}
+        customStyle={customStyle}
+        codeTagProps={{
+          style: codeTagStyle,
+        }}
+      >
+        {value}
+      </SyntaxHighlighter>
+    </div>
+  );
+});
 
 // Custom Dropdown Component - mở lên trên
 const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
@@ -46,7 +121,12 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
           textAlign: "left",
           cursor: disabled ? "not-allowed" : "pointer",
           position: "relative",
-          paddingRight: "28px" // Tạo không gian cho mũi tên
+          paddingRight: "28px", // Tạo không gian cho caret
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          fontWeight: "700",
+          letterSpacing: "0.01em"
         }}
       >
         {selectedLabel}
@@ -54,15 +134,16 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
           className="modelDropdownArrow"
           style={{ 
             position: "absolute", 
-            right: "8px", 
+            right: "10px", 
             top: "50%", 
-            transform: "translateY(-50%)",
-            fontSize: "0.7rem",
-            opacity: 0.7,
-            pointerEvents: "none"
+            transform: "translateY(-52%)",
+            fontSize: "11px",
+            opacity: 0.75,
+            pointerEvents: "none",
+            color: "var(--topbar-fg)"
           }}
         >
-          {isOpen ? "▲" : "▼"}
+          {isOpen ? "▴" : "▾"}
         </span>
       </button>
       
@@ -76,48 +157,91 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
             left: 0,
             right: 0,
             marginBottom: "4px",
-            background: "var(--panel, #f5f1ea)",
-            border: "1px solid var(--border, rgba(28,26,23,0.12))",
-            borderRadius: "6px",
+            borderRadius: "8px", /* Đồng nhất với model selector */
             boxShadow: "0 -4px 12px rgba(0,0,0,0.15)",
             zIndex: 1000,
             maxHeight: "200px",
-            overflowY: "auto"
+            overflowY: "auto",
+            padding: "4px 0" /* Padding cho dropdown items */
           }}
         >
-          {models.map((model) => (
-            <button
-              key={model.value}
-              type="button"
-              onClick={() => {
-                onSelect(model.value);
-                setIsOpen(false);
-              }}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                textAlign: "left",
-                background: model.value === selectedModel ? "rgba(28,26,23,0.08)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "0.8125rem",
-                color: "var(--text, #1c1a17)",
-                transition: "background 0.2s ease"
-              }}
-              onMouseEnter={(e) => {
-                if (model.value !== selectedModel) {
-                  e.target.style.background = "rgba(28,26,23,0.06)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (model.value !== selectedModel) {
-                  e.target.style.background = "transparent";
-                }
-              }}
-            >
-              {model.label}
-            </button>
-          ))}
+          {models.map((model) => {
+            const isSelected = model.value === selectedModel;
+            return (
+              <button
+                key={model.value}
+                type="button"
+                onClick={() => {
+                  onSelect(model.value);
+                  setIsOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "6px 12px",
+                  textAlign: "left",
+                  background: "transparent", /* Bỏ highlight */
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: isSelected ? "700" : "500",
+                  letterSpacing: "0.01em",
+                  color: "var(--topbar-fg)",
+                  transition: "color 0.2s ease, text-decoration 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", "Roboto", system-ui, sans-serif',
+                  textDecoration: "none"
+                }}
+                onMouseEnter={(e) => {
+                  const textSpan = e.currentTarget.querySelector('span:last-child');
+                  if (textSpan) {
+                    textSpan.style.color = "var(--model-hover-text)";
+                    textSpan.style.textDecoration = "underline";
+                    textSpan.style.textShadow = "var(--model-hover-shadow)";
+                    textSpan.style.textDecorationThickness = "1.5px";
+                    textSpan.style.textUnderlineOffset = "2px";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const textSpan = e.currentTarget.querySelector('span:last-child');
+                  if (textSpan) {
+                    textSpan.style.color = "var(--topbar-fg)";
+                    textSpan.style.textDecoration = "none";
+                    textSpan.style.textShadow = "none";
+                  }
+                }}
+              >
+                {/* Tick box - chỉ hiển thị khi selected */}
+                {isSelected && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    style={{
+                      flexShrink: 0,
+                      color: "var(--model-tick)"
+                    }}
+                  >
+                    <path
+                      d="M13.5 4.5L6 12L2.5 8.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+                {!isSelected && (
+                  <span style={{ width: "14px", flexShrink: 0 }}></span>
+                )}
+                <span style={{ 
+                  transition: "color 0.2s ease, text-decoration 0.2s ease, text-shadow 0.2s ease"
+                }}>{model.label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -126,7 +250,6 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
 
 // Component để render Markdown - với syntax highlighting và copy button
 const MarkdownRenderer = ({ content, isStreaming }) => {
-  const [copiedCodeBlocks, setCopiedCodeBlocks] = useState({});
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return document.documentElement.getAttribute("data-theme") === "dark" ||
@@ -169,268 +292,130 @@ const MarkdownRenderer = ({ content, isStreaming }) => {
   // Dùng theme chuẩn của react-syntax-highlighter thay vì tự bịa
   // oneDark và oneLight đã được import sẵn
   
+  // Memoize components để tránh re-render
+  const markdownComponents = useMemo(() => ({
+    // Custom styles cho các elements
+    // Sửa p component để không wrap code blocks trong <p>
+    p: ({ children, node }) => {
+      // Kiểm tra nếu paragraph chứa code block (pre hoặc div.codeBlock) thì không wrap trong <p>
+      const hasCodeBlock = React.Children.toArray(children).some(
+        (child) => {
+          if (!React.isValidElement(child)) return false;
+          // Kiểm tra nếu là pre tag
+          if (child.type === 'pre') return true;
+          // Kiểm tra nếu là div với className codeBlock
+          if (child.type === 'div' && child.props?.className === 'codeBlock') return true;
+          // Kiểm tra nếu props có node với tagName là pre
+          if (child.props?.node?.tagName === 'pre') return true;
+          return false;
+        }
+      );
+      
+      if (hasCodeBlock) {
+        // Nếu có code block, return children trực tiếp (không wrap trong <p>)
+        return <>{children}</>;
+      }
+          
+      return <p style={{ margin: "0 0 0.8em 0" }}>{children}</p>;
+    },
+    code: ({ node, inline, className, children, ...props }) => {
+      const match = /language-(\w+)/.exec(className || '');
+      const language = match ? match[1] : '';
+      const value = String(children ?? "").replace(/\n$/, "");
+      
+      if (inline) {
+        return <code {...props}>{children}</code>;
+      }
+      
+      // Nếu đang streaming, render code block dạng thô để tránh giật/nhảy
+      if (isStreaming) {
+        return (
+          <pre
+            style={{
+              margin: "1em 0",
+              padding: "12px 14px",
+              borderRadius: "8px",
+              maxWidth: "100%",
+              border: isDark
+                ? "1px solid rgba(255,255,255,0.10)"
+                : "1px solid rgba(0,0,0,0.10)",
+              background: isDark ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.04)",
+              color: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.86)",
+              fontFamily:
+                "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
+              fontSize: "0.875rem",
+              lineHeight: "1.55",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+            }}
+          >
+            {value}
+          </pre>
+        );
+      }
+          
+      // Memoize CodeBlock để tránh re-render khi streaming
+      return <CodeBlock key={`${language}-${value.substring(0, 20)}`} language={language} value={value} isDark={isDark} />;
+    },
+    pre: ({ children }) => {
+      // pre tag sẽ được xử lý bởi code component, chỉ cần return children
+      return <>{children}</>;
+    },
+    ul: ({ children }) => <ul style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ul>,
+    ol: ({ children }) => <ol style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ol>,
+    li: ({ children }) => <li style={{ margin: "0.3em 0" }}>{children}</li>,
+    blockquote: ({ children }) => (
+      <blockquote style={{ 
+        borderLeft: "3px solid rgba(0,0,0,0.2)", 
+        paddingLeft: "1em", 
+        margin: "0.8em 0",
+        fontStyle: "italic"
+      }}>
+        {children}
+      </blockquote>
+    ),
+    h1: ({ children }) => <h1 style={{ margin: "1em 0 0.5em 0", fontSize: "1.5em", fontWeight: "bold" }}>{children}</h1>,
+    h2: ({ children }) => <h2 style={{ margin: "1em 0 0.5em 0", fontSize: "1.3em", fontWeight: "bold" }}>{children}</h2>,
+    h3: ({ children }) => <h3 style={{ margin: "0.8em 0 0.4em 0", fontSize: "1.1em", fontWeight: "bold" }}>{children}</h3>,
+    a: ({ href, children }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#0066cc", textDecoration: "underline" }}>
+        {children}
+      </a>
+    ),
+    table: ({ children }) => (
+      <table style={{ 
+        borderCollapse: "collapse", 
+        width: "100%", 
+        margin: "0.8em 0",
+        border: "1px solid rgba(0,0,0,0.1)"
+      }}>
+        {children}
+      </table>
+    ),
+    th: ({ children }) => (
+      <th style={{ 
+        border: "1px solid rgba(0,0,0,0.1)", 
+        padding: "8px", 
+        background: "rgba(0,0,0,0.05)",
+        fontWeight: "bold"
+      }}>
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td style={{ border: "1px solid rgba(0,0,0,0.1)", padding: "8px" }}>
+        {children}
+      </td>
+    ),
+  }), [isDark, isStreaming]);
+
   return (
     <ReactMarkdown 
       remarkPlugins={[remarkGfm]}
-      components={{
-        // Custom styles cho các elements
-        p: ({ children }) => <p style={{ margin: "0 0 0.8em 0" }}>{children}</p>,
-        code: ({ node, inline, className, children, ...props }) => {
-          const match = /language-(\w+)/.exec(className || '');
-          const language = match ? match[1] : '';
-          const codeString = String(children).replace(/\n$/, '');
-          
-          if (inline) {
-            return (
-              <code style={{ 
-                background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", 
-                padding: "3px 6px", 
-                borderRadius: "4px",
-                fontSize: "0.9em",
-                fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace",
-                color: isDark ? "#d4d4d4" : "#1a1a1a",
-                border: isDark 
-                  ? "1px solid rgba(255,255,255,0.08)" 
-                  : "1px solid rgba(0,0,0,0.06)",
-                fontWeight: "500"
-              }} {...props}>
-                {children}
-              </code>
-            );
-          }
-          
-          // Nếu đang streaming, render code block dạng thô để tránh giật/nhảy
-          if (isStreaming) {
-            return (
-              <pre
-                style={{
-                  margin: "1em 0",
-                  padding: "12px 14px",
-                  borderRadius: "8px",
-                  maxWidth: "100%",
-                  border: isDark
-                    ? "1px solid rgba(255,255,255,0.10)"
-                    : "1px solid rgba(0,0,0,0.10)",
-                  background: isDark ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.04)",
-                  color: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.86)",
-                  fontFamily:
-                    "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
-                  fontSize: "0.875rem",
-                  lineHeight: "1.55",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  overflowWrap: "break-word",
-                }}
-              >
-                {codeString}
-              </pre>
-            );
-          }
-          
-          // CodeId đơn giản để track copy state
-          const codeId = `${language || "text"}-${codeString.substring(0, 20)}`;
-          
-          return (
-            <div 
-              style={{ 
-                position: "relative", 
-                margin: "1em 0",
-                borderRadius: "8px",
-                border: isDark 
-                  ? "1px solid rgba(255,255,255,0.1)" 
-                  : "1px solid rgba(0,0,0,0.08)",
-                boxShadow: isDark
-                  ? "0 2px 8px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)"
-                  : "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
-                background: isDark ? "#1e1e1e" : "#f8f8f8"
-              }}
-            >
-              {/* Header bar với language và copy button */}
-              <div style={{ 
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "8px 12px",
-                background: isDark 
-                  ? "rgba(255,255,255,0.03)" 
-                  : "rgba(0,0,0,0.02)",
-                borderBottom: isDark
-                  ? "1px solid rgba(255,255,255,0.08)"
-                  : "1px solid rgba(0,0,0,0.06)",
-                minHeight: "36px"
-              }}>
-                {language && (
-                  <span style={{
-                    fontSize: "0.75rem",
-                    fontWeight: "500",
-                    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                    padding: "4px 8px",
-                    background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                    borderRadius: "4px",
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px"
-                  }}>
-                    {language}
-                  </span>
-                )}
-                {!language && <span></span>}
-                <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(codeString);
-                      setCopiedCodeBlocks(prev => ({ ...prev, [codeId]: true }));
-                      setTimeout(() => {
-                        setCopiedCodeBlocks(prev => {
-                          const next = { ...prev };
-                          delete next[codeId];
-                          return next;
-                        });
-                      }, 2000);
-                    } catch (e) {
-                      console.error("Failed to copy:", e);
-                    }
-                  }}
-                  style={{
-                    background: copiedCodeBlocks[codeId]
-                      ? (isDark ? "rgba(76, 175, 80, 0.2)" : "rgba(76, 175, 80, 0.15)")
-                      : (isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"),
-                    border: "none",
-                    borderRadius: "4px",
-                    padding: "6px 12px",
-                    cursor: "pointer",
-                    fontSize: "0.75rem",
-                    fontWeight: "500",
-                    color: copiedCodeBlocks[codeId]
-                      ? (isDark ? "#4caf50" : "#2e7d32")
-                      : (isDark ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.8)"),
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!copiedCodeBlocks[codeId]) {
-                      e.target.style.background = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!copiedCodeBlocks[codeId]) {
-                      e.target.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-                    }
-                  }}
-                  title={copiedCodeBlocks[codeId] ? "Copied!" : "Copy code"}
-                >
-                  {copiedCodeBlocks[codeId] ? (
-                    <>
-                      <span>✓</span>
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>⧉</span>
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%"
-                }}
-              >
-                <SyntaxHighlighter
-                  language={language || 'text'}
-                  style={isDark ? oneDark : oneLight}
-                  showLineNumbers={false}
-                  wrapLines={false}
-                  wrapLongLines={false}
-                  customStyle={{
-                    margin: 0,
-                    padding: "14px 16px",
-                    borderRadius: 0,
-                    fontSize: "0.875rem",
-                    lineHeight: "1.6",
-                    fontFamily: "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
-                    background: "transparent",
-                    fontWeight: 450,
-                    WebkitFontSmoothing: "antialiased",
-                    MozOsxFontSmoothing: "grayscale",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    overflowWrap: "break-word"
-                  }}
-                  PreTag="div"
-                  codeTagProps={{
-                    style: {
-                      fontFamily: "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
-                      display: "block",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      overflowWrap: "break-word"
-                    }
-                  }}
-                  {...props}
-                >
-                  {codeString}
-                </SyntaxHighlighter>
-              </div>
-            </div>
-          );
-        },
-        pre: ({ children }) => {
-          // pre tag sẽ được xử lý bởi code component, chỉ cần return children
-          return <>{children}</>;
-        },
-        ul: ({ children }) => <ul style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ul>,
-        ol: ({ children }) => <ol style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ol>,
-        li: ({ children }) => <li style={{ margin: "0.3em 0" }}>{children}</li>,
-        blockquote: ({ children }) => (
-          <blockquote style={{ 
-            borderLeft: "3px solid rgba(0,0,0,0.2)", 
-            paddingLeft: "1em", 
-            margin: "0.8em 0",
-            fontStyle: "italic"
-          }}>
-            {children}
-          </blockquote>
-        ),
-        h1: ({ children }) => <h1 style={{ margin: "1em 0 0.5em 0", fontSize: "1.5em", fontWeight: "bold" }}>{children}</h1>,
-        h2: ({ children }) => <h2 style={{ margin: "1em 0 0.5em 0", fontSize: "1.3em", fontWeight: "bold" }}>{children}</h2>,
-        h3: ({ children }) => <h3 style={{ margin: "0.8em 0 0.4em 0", fontSize: "1.1em", fontWeight: "bold" }}>{children}</h3>,
-        a: ({ href, children }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#0066cc", textDecoration: "underline" }}>
-            {children}
-          </a>
-        ),
-        table: ({ children }) => (
-          <table style={{ 
-            borderCollapse: "collapse", 
-            width: "100%", 
-            margin: "0.8em 0",
-            border: "1px solid rgba(0,0,0,0.1)"
-          }}>
-            {children}
-          </table>
-        ),
-        th: ({ children }) => (
-          <th style={{ 
-            border: "1px solid rgba(0,0,0,0.1)", 
-            padding: "8px", 
-            background: "rgba(0,0,0,0.05)",
-            fontWeight: "bold"
-          }}>
-            {children}
-          </th>
-        ),
-        td: ({ children }) => (
-          <td style={{ border: "1px solid rgba(0,0,0,0.1)", padding: "8px" }}>
-            {children}
-          </td>
-        ),
-      }}
+      unwrapDisallowed={true}
+      allowedElements={undefined}
+      components={markdownComponents}
     >
       {content || " "}
     </ReactMarkdown>
@@ -446,35 +431,14 @@ const DEFAULT_MODELS = [
 const MODEL_STORAGE_KEY = "ai_agent_selected_model";
 
 export default function App() {
-  // Safe Clerk hook: allow running without ClerkProvider
-  let user = null;
-  let getTokenFromHook = null;
-  try {
-    const userHook = useUser();
-    user = userHook.user;
-    getTokenFromHook = userHook.getToken;
-  } catch (e) {
-    if (import.meta.env.DEV) {
-      console.warn("⚠️ ClerkProvider missing. Running in no-auth mode.");
-    }
-  }
-
+  const { user, getToken: getTokenFromHook } = useUser(); // Clerk hooks
   // Fallback getToken function
-  const getToken = getTokenFromHook || (typeof window !== "undefined" && window.__CLERK_GET_TOKEN__
-    ? async () => await window.__CLERK_GET_TOKEN__()
+  const getToken = getTokenFromHook || (typeof window !== "undefined" && window.__CLERK_GET_TOKEN__ 
+    ? async () => await window.__CLERK_GET_TOKEN__() 
     : async () => null);
-  
   const [status, setStatus] = useState("ready"); // ready | creating | streaming | error
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState([]);
-  
-  // Debug: Log khi component mount (chỉ log một lần)
-  useEffect(() => {
-    const theme = document.documentElement.getAttribute("data-theme");
-    if (theme === "dark") {
-      console.log("💡 [INFO] UI đang ở chế độ DARK. Click nút theme toggle (☀️/🌙) để đổi sang LIGHT.");
-    }
-  }, []);
   
   // useEffect để tự động reset textarea về kích thước ban đầu khi input empty
   // Chạy ngay khi input thay đổi thành empty
@@ -596,7 +560,14 @@ export default function App() {
 
   const stopStream = () => {
     if (esRef.current) {
-      try { esRef.current.close(); } catch {}
+      try { 
+        // Chỉ close nếu stream chưa đóng
+        if (esRef.current.readyState !== EventSource.CLOSED) {
+          esRef.current.close(); 
+        }
+      } catch (e) {
+        console.warn("Error closing stream:", e);
+      }
     }
     esRef.current = null;
   };
@@ -697,7 +668,12 @@ export default function App() {
     return data.sid;
   };
 
-  const streamJob = async (sid) => {
+  const streamJob = async (sid, retryCount = 0) => {
+    const MAX_RETRIES = 1; // Chỉ retry 1 lần để tránh chờ lâu
+    const RETRY_DELAY_MS = 1000; // Đợi 1 giây trước khi retry
+    const INITIAL_TIMEOUT_MS = 5000; // 5 giây timeout cho initial connection (không nhận token)
+    const STREAM_TIMEOUT_MS = 5000; // 5 giây timeout nếu không nhận token mới
+    
     // buildStreamUrl là async function, cần await
     const streamUrl = await buildStreamUrl(sid);
     return new Promise((resolve, reject) => {
@@ -705,8 +681,80 @@ export default function App() {
       esRef.current = es;
 
       let gotToken = false;
+      let connectionTimeout;
+      let streamTimeout;
+      let isResolved = false; // Flag để tránh resolve/reject nhiều lần
 
-      es.addEventListener("meta", () => setStatusDom("streaming"));
+      const cleanup = () => {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (streamTimeout) clearTimeout(streamTimeout);
+      };
+
+      const safeReject = (error) => {
+        if (isResolved) return;
+        isResolved = true;
+        cleanup();
+        stopStream();
+        reject(error);
+      };
+
+      const safeResolve = (result) => {
+        if (isResolved) return;
+        isResolved = true;
+        cleanup();
+        stopStream();
+        resolve(result);
+      };
+
+      // Timeout nếu không nhận được token trong 5 giây (báo lỗi ngay, không chờ lâu)
+      connectionTimeout = setTimeout(() => {
+        if (!gotToken) {
+          console.warn("⚠️ Initial connection timeout - no tokens received in 5s");
+          
+          // Không retry nếu đã retry rồi - báo lỗi ngay
+          if (retryCount >= MAX_RETRIES) {
+            setStatusDom("error");
+            safeReject(new Error("Kết nối quá lâu. Vui lòng thử lại."));
+            return;
+          }
+          
+          // Retry 1 lần duy nhất
+          const attempt = retryCount + 1;
+          console.log(`🔄 Retrying connection (${attempt}/${MAX_RETRIES + 1})...`);
+          cleanup();
+          stopStream();
+          setStatusDom("ready");
+          
+          setTimeout(() => {
+            streamJob(sid, retryCount + 1)
+              .then(resolve)
+              .catch(reject);
+          }, RETRY_DELAY_MS);
+        }
+      }, INITIAL_TIMEOUT_MS);
+
+      // Reset stream timeout mỗi khi nhận token
+      const resetStreamTimeout = () => {
+        if (streamTimeout) clearTimeout(streamTimeout);
+        if (gotToken) {
+          // Nếu đã nhận token, cho phép stream dài hơn (5s)
+          streamTimeout = setTimeout(() => {
+            console.warn("⚠️ Stream timeout - no new tokens for 5s");
+            setStatusDom("error");
+            safeReject(new Error("Stream bị gián đoạn. Phản hồi có thể chưa hoàn tất."));
+          }, STREAM_TIMEOUT_MS);
+        }
+      };
+
+      es.addEventListener("meta", () => {
+        setStatusDom("streaming");
+        // Clear initial timeout khi nhận meta (đã kết nối)
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+          connectionTimeout = null;
+        }
+        resetStreamTimeout();
+      });
 
       es.addEventListener("token", (ev) => {
         try {
@@ -714,7 +762,15 @@ export default function App() {
           const tok = typeof p.t === "string" ? p.t : "";
           if (!tok) return;
 
+          // Clear initial timeout khi nhận token đầu tiên
+          if (!gotToken && connectionTimeout) {
+            clearTimeout(connectionTimeout);
+            connectionTimeout = null;
+          }
+          
           gotToken = true;
+          resetStreamTimeout(); // Reset stream timeout mỗi khi nhận token
+          
           const tid = activeRef.current.turnId;
           if (!tid) return;
 
@@ -735,28 +791,64 @@ export default function App() {
       });
 
       es.addEventListener("done", () => {
-        stopStream();
         setStatusDom("ready");
-        resolve({ gotToken });
+        safeResolve({ gotToken });
       });
 
       es.addEventListener("error", (ev) => {
         let msg = "sse_connection_error";
+        let isTimeout = false;
+        let isRetryable = false;
+        
         try {
           const p = JSON.parse(ev?.data || "{}");
-          if (p && p.error) msg = p.error;
+          if (p && p.error) {
+            msg = p.error;
+            isTimeout = msg.includes("timeout") || msg.includes("upstream_timeout");
+            isRetryable = isTimeout || msg.includes("connection") || msg.includes("network");
+          }
         } catch {}
         
-        stopStream();
+        console.error("⚠️ Stream error event:", msg);
+        
+        // Retry logic: chỉ retry nếu chưa retry và là lỗi có thể retry
+        if (isRetryable && retryCount < MAX_RETRIES) {
+          const attempt = retryCount + 1;
+          console.log(`🔄 Retrying after error: ${msg} (${attempt}/${MAX_RETRIES + 1})...`);
+          cleanup();
+          stopStream();
+          setStatusDom("ready");
+          
+          // Retry với delay
+          setTimeout(() => {
+            streamJob(sid, retryCount + 1)
+              .then(resolve)
+              .catch(reject);
+          }, RETRY_DELAY_MS);
+          return;
+        }
+        
+        // Đã retry hết hoặc không phải lỗi có thể retry - báo lỗi ngay
         setStatusDom("error");
-        reject(new Error(msg));
+        const errorMsg = isTimeout 
+          ? "Phản hồi quá lâu. Vui lòng thử lại." 
+          : (msg === "sse_connection_error" ? "Lỗi kết nối. Vui lòng thử lại." : msg);
+        safeReject(new Error(errorMsg));
+      });
+      
+      // Listen cho ping events để giữ connection alive
+      es.addEventListener("ping", () => {
+        // Reset stream timeout khi nhận ping
+        resetStreamTimeout();
       });
 
       es.onerror = (e) => {
-        console.error("EventSource error:", e);
-        stopStream();
-        setStatusDom("error");
-        reject(new Error("EventSource connection error"));
+        // Chỉ log, không xử lý ở đây vì error event đã xử lý
+        // Tránh double handling
+        if (e.type === 'error' && e.target?.readyState === EventSource.CLOSED) {
+          // Stream đã đóng - đã được xử lý bởi error event listener
+          return;
+        }
       };
     });
   };
@@ -853,17 +945,14 @@ export default function App() {
 
   // Khởi tạo theme ngay khi component mount
   useEffect(() => {
-    // FORCE light mode để tránh UI tối om (user có thể đổi bằng nút toggle)
     const THEME_KEY = "ui_theme";
+    const getSystemTheme = () => {
+      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    };
     const saved = localStorage.getItem(THEME_KEY);
-    let theme = "light"; // Mặc định light
-    if (saved === "light") {
-      theme = "light";
-    } else if (saved === "dark") {
-      // Force light để tránh tối om
-      theme = "light";
-      localStorage.setItem(THEME_KEY, "light"); // Update localStorage
-    }
+    const theme = saved === "dark" || saved === "light" ? saved : getSystemTheme();
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
   
@@ -1050,19 +1139,6 @@ export default function App() {
         let startIdealRem = 2.0;
         let activePointerId = null;
         
-        const endDrag = () => {
-          if (!dragging) return;
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          
-          // Remove listeners từ document
-          document.removeEventListener("pointermove", handlePointerMove);
-          document.removeEventListener("pointerup", handlePointerUp);
-          
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
-        };
-        
         const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
           
@@ -1108,6 +1184,19 @@ export default function App() {
           e.preventDefault();
         });
         
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
+        };
+        
         grip.addEventListener("pointercancel", endDrag);
         window.addEventListener("blur", endDrag);
       };
@@ -1130,19 +1219,6 @@ export default function App() {
         let startIdealVw = 28;
         let activePointerId = null;
         
-        const endDrag = () => {
-          if (!dragging) return;
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          
-          // Remove listeners từ document
-          document.removeEventListener("pointermove", handlePointerMove);
-          document.removeEventListener("pointerup", handlePointerUp);
-          
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
-        };
-        
         const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
           
@@ -1163,6 +1239,19 @@ export default function App() {
           if (activePointerId != null && e.pointerId !== activePointerId) return;
           endDrag();
           e.preventDefault();
+        };
+        
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
         };
         
         grip.addEventListener("pointerdown", (e) => {
@@ -1256,7 +1345,7 @@ export default function App() {
 
   return (
     <>
-      {/* React App */}
+      {/* React App - thay thế HTML tĩnh */}
       <div className="topbar" data-react="true">
         {/* Left: Clock */}
         <div className="tbLeft">

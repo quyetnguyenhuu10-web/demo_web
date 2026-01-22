@@ -1,11 +1,7 @@
 // web_ui/server.cjs - Backend API server
 // Đọc config từ biến môi trường (.env)
 
-const path = require("path");
-const fs = require("fs");
-
-// Load .env file từ cùng thư mục với server.cjs
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+require("dotenv").config();
 
 // Khai báo DEBUG ngay từ đầu để tránh temporal dead zone
 const DEBUG = process.env.DEBUG === "true" || false;
@@ -14,17 +10,17 @@ const https = require("https");
 const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
 
 // ---------------- Đọc danh sách model từ file ---------------- 
 let AVAILABLE_MODELS = [];
-let DEFAULT_MODEL = "gpt-4o-mini";
 
 try {
   const modelsPath = path.join(__dirname, "models.json");
   if (fs.existsSync(modelsPath)) {
     const modelsData = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
     AVAILABLE_MODELS = modelsData.models || [];
-    DEFAULT_MODEL = modelsData.default || "gpt-4o-mini";
     console.log(`✅ Loaded ${AVAILABLE_MODELS.length} models from models.json`);
   } else {
     console.warn("⚠️  models.json not found, using default models");
@@ -33,7 +29,6 @@ try {
       { value: "gpt-4o-mini", label: "GPT-4o Mini", description: "Model nhanh và tiết kiệm chi phí" },
       { value: "gpt-5-mini", label: "GPT-5 Mini", description: "Model mới nhất, hiệu suất cao hơn" }
     ];
-    DEFAULT_MODEL = "gpt-4o-mini";
   }
 } catch (e) {
   console.error("❌ Error loading models.json:", e.message);
@@ -42,7 +37,6 @@ try {
     { value: "gpt-4o-mini", label: "GPT-4o Mini", description: "Model nhanh và tiết kiệm chi phí" },
     { value: "gpt-5-mini", label: "GPT-5 Mini", description: "Model mới nhất, hiệu suất cao hơn" }
   ];
-  DEFAULT_MODEL = "gpt-4o-mini";
 }
 
 // Tạo danh sách giá trị model để validation
@@ -51,34 +45,33 @@ const VALID_MODELS = AVAILABLE_MODELS.map(m => m.value);
 // ---------------- Config từ env ---------------- 
 const PORT = Number(process.env.PORT || 3001);
 const OPENAI_KEY = String(process.env.OPENAI_API_KEY || "").trim();
-// KHÔNG dùng MODEL từ env nữa - chỉ lấy từ models.json và UI selection
-// MODEL chỉ dùng làm fallback nếu UI không gửi model
-const MODEL = DEFAULT_MODEL; // Chỉ dùng default từ models.json
-const SYSTEM_PROMPT = String(process.env.SYSTEM_PROMPT || "You are a helpful assistant.");
+// KHÔNG có model mặc định - phải lấy từ UI selection
+// SYSTEM_PROMPT BẮT BUỘC phải có trong .env - không có fallback
+const SYSTEM_PROMPT = String(process.env.SYSTEM_PROMPT || "").trim();
 const MAX_INPUT_CHARS = Number(process.env.MAX_INPUT_CHARS || 8000);
 
 // Log SYSTEM_PROMPT để debug
 if (DEBUG || process.env.LOG_PROMPT === "true") {
-  console.log(`[Config] SYSTEM_PROMPT: ${SYSTEM_PROMPT.substring(0, 100)}${SYSTEM_PROMPT.length > 100 ? "..." : ""}`);
+  if (SYSTEM_PROMPT) {
+    console.log(`[Config] SYSTEM_PROMPT (length=${SYSTEM_PROMPT.length}): ${SYSTEM_PROMPT.substring(0, 200)}${SYSTEM_PROMPT.length > 200 ? "..." : ""}`);
+  } else {
+    console.warn(`[Config] SYSTEM_PROMPT is empty or not set`);
+  }
 }
 
 // Log models info
 console.log(`✅ Available models: ${AVAILABLE_MODELS.map(m => m.value).join(", ")}`);
-console.log(`✅ Default model: ${DEFAULT_MODEL}`);
-
-// Debug: Log để kiểm tra key có được load không (chỉ hiện 4 ký tự đầu)
-if (DEBUG) {
-  const keyPreview = OPENAI_KEY ? `${OPENAI_KEY.substring(0, 4)}...` : "NOT SET";
-  console.log(`[DEBUG] OPENAI_API_KEY: ${keyPreview}`);
-}
+console.log(`✅ No default model - model must be selected from UI`);
 
 if (!OPENAI_KEY) {
   console.error("❌ Missing OPENAI_API_KEY in .env file");
   console.error("   Tạo file .env và thêm: OPENAI_API_KEY=sk-...");
-  console.error(`   Current working directory: ${process.cwd()}`);
-  console.error(`   Looking for .env at: ${path.join(__dirname, ".env")}`);
-  const envExists = fs.existsSync(path.join(__dirname, ".env"));
-  console.error(`   .env file exists: ${envExists}`);
+  process.exit(1);
+}
+
+if (!SYSTEM_PROMPT) {
+  console.error("❌ Missing SYSTEM_PROMPT in .env file");
+  console.error("   Tạo file .env và thêm: SYSTEM_PROMPT=Your prompt here...");
   process.exit(1);
 }
 
@@ -192,12 +185,38 @@ function sseHeaders(res) {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
+  
+  // Disable timeout cho response này
+  if (res.setTimeout) {
+    res.setTimeout(0); // Không timeout cho SSE connection
+  }
+  
   res.flushHeaders?.();
   res.write(`:ok\n\n`);
+  
+  // Flush ngay để client biết connection đã thiết lập
+  if (res.flush) {
+    res.flush();
+  }
 }
 function sseWrite(res, event, data) {
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data ?? {})}\n\n`);
+  try {
+    const eventLine = `event: ${event}\n`;
+    const dataLine = `data: ${JSON.stringify(data ?? {})}\n\n`;
+    res.write(eventLine);
+    res.write(dataLine);
+    
+    // Flush ngay sau mỗi event để tránh buffer - QUAN TRỌNG
+    if (res.flush) {
+      res.flush();
+    } else if (res.flushHeaders) {
+      // Fallback: nếu không có flush, ít nhất flush headers
+      res.flushHeaders();
+    }
+  } catch (e) {
+    // Ignore write errors (client có thể đã disconnect)
+    // Không log để tránh spam
+  }
 }
 
 // ---------------- SSE parse helpers ---------------- 
@@ -266,6 +285,20 @@ function flushTokenBuf(sid, force = false) {
 
   // Broadcast token chunk (giữ event name token)
   broadcast(sid, "token", { t: chunk });
+  
+  // Đảm bảo flush ngay sau broadcast cho TẤT CẢ subscribers
+  // QUAN TRỌNG: Flush để tránh buffer và timeout
+  for (const res of job.subscribers) {
+    try {
+      if (res.flush) {
+        res.flush();
+      } else if (res.flushHeaders) {
+        res.flushHeaders();
+      }
+    } catch (e) {
+      // Client có thể đã disconnect, ignore
+    }
+  }
 }
 
 function scheduleTokenFlush(sid) {
@@ -431,6 +464,11 @@ async function requireAuthorization(req, res, next) {
 
 // ---------------- App ---------------- 
 const app = express();
+// Tăng timeout cho server để tránh upstream_timeout
+app.timeout = 0; // Disable timeout cho toàn bộ app
+app.keepAliveTimeout = 65000; // 65 giây keep-alive
+app.headersTimeout = 66000; // 66 giây headers timeout
+
 // CORS với credentials để Clerk cookies hoạt động
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -443,7 +481,7 @@ app.use(cors({
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, model: MODEL, port: PORT, ts: isoNow() });
+  res.json({ ok: true, port: PORT, ts: isoNow() });
 });
 
 // ---------------- API: Get available models ---------------- 
@@ -456,8 +494,7 @@ app.get("/api/models", (req, res) => {
   res.json({
     ok: true,
     models: AVAILABLE_MODELS,
-    default: DEFAULT_MODEL,
-    // Không trả về current nữa - model được chọn từ UI
+    // Không có default model - phải chọn từ UI
   });
 });
 
@@ -531,13 +568,20 @@ app.post("/api/chat/create",
 
   const message = safeStr(req.body?.message).trim();
   const history = Array.isArray(req.body?.history) ? req.body.history : [];
-  // Nhận model từ request body (từ UI selection)
+  // Nhận model từ request body (từ UI selection) - BẮT BUỘC
   const requestModel = safeStr(req.body?.model).trim();
-  // Chỉ dùng model từ UI, fallback về DEFAULT_MODEL nếu không có
-  const jobModel = requestModel || DEFAULT_MODEL;
+  
+  if (!requestModel) {
+    return res.status(400).json({ 
+      error: "model_is_required",
+      message: "Model must be selected from UI. Available models: " + VALID_MODELS.join(", ")
+    });
+  }
+  
+  const jobModel = requestModel;
   
   if (DEBUG) {
-    console.log(`[${isoNow()}] create job - requestModel: "${requestModel}", jobModel: "${jobModel}", DEFAULT_MODEL: "${DEFAULT_MODEL}"`);
+    console.log(`[${isoNow()}] create job - requestModel: "${requestModel}", jobModel: "${jobModel}"`);
   }
   
   // Cảnh báo nếu model không trong danh sách (nhưng vẫn cho phép dùng)
@@ -678,18 +722,31 @@ app.get("/api/chat/stream", async (req, res) => {
   // Nếu không có Clerk hoặc đã verify xong, tiếp tục stream
 
   sseHeaders(res);
-  // Lấy model từ job (đã được set từ UI selection), fallback về DEFAULT_MODEL
-  const jobModel = job?.model || DEFAULT_MODEL;
+  // Lấy model từ job (đã được set từ UI selection) - BẮT BUỘC
+  const jobModel = job?.model;
+  if (!jobModel) {
+    console.error(`[${isoNow()}] ❌ Stream: Job missing model for sid=${sid}`);
+    sseWrite(res, "error", { error: "Job missing model" });
+    res.end();
+    return;
+  }
   sseWrite(res, "meta", { ok: true, sid, model: jobModel, ts: isoNow() });
 
   job.subscribers.add(res);
   if (DEBUG) console.log(`[${isoNow()}] stream connect sid=${sid} subs=${job.subscribers.size}`);
 
+  // Heartbeat mỗi 5 giây để giữ connection alive và tránh timeout
+  // QUAN TRỌNG: Gửi ping đều đặn để proxy/server không timeout
   const hb = setInterval(() => {
     try {
+      // Gửi ping và flush ngay
       sseWrite(res, "ping", { t: Date.now() });
-    } catch {}
-  }, 15000);
+    } catch (e) {
+      // Nếu không thể write, client đã disconnect
+      clearInterval(hb);
+      job.subscribers.delete(res);
+    }
+  }, 5000); // Giảm xuống 5 giây để đảm bảo connection không timeout
 
   req.on("close", () => {
     clearInterval(hb);
@@ -784,17 +841,40 @@ async function startUpstreamCore(sid, input) {
   const job = jobs.get(sid);
   if (!job) return;
 
-  // Dùng model từ job (được set từ request body hoặc env)
-  const modelToUse = job.model || MODEL;
+  // Dùng model từ job (được set từ request body) - BẮT BUỘC
+  const modelToUse = job.model;
+  if (!modelToUse) {
+    console.error(`[${isoNow()}] ❌ upstream: Job missing model for sid=${sid}`);
+    broadcast(sid, "error", { error: "Job missing model" });
+    finishJob(sid);
+    return;
+  }
+  // Payload đồng nhất - model chỉ là parameter, không có logic riêng
   const payload = JSON.stringify({ model: modelToUse, stream: true, input });
   const bodyBytes = Buffer.byteLength(payload, "utf8");
+  const inputLength = input.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+  const systemPromptLength = input[0]?.content?.length || 0;
 
-  if (DEBUG) console.log(`[${isoNow()}] upstream start sid=${sid} bytes=${bodyBytes}`);
+  // Track start time để tính duration
+  const startTime = Date.now();
+
+  // Log chi tiết để debug - đảm bảo cả 2 model được xử lý giống nhau
+  console.log(`[${isoNow()}] upstream start sid=${sid} model=${modelToUse} bytes=${bodyBytes} input_len=${inputLength} messages=${input.length} system_prompt_len=${systemPromptLength}`);
+  
+  // Log system prompt để đảm bảo prompt được gửi đúng
+  if (DEBUG && input[0]?.content) {
+    console.log(`[${isoNow()}] system prompt (first 200 chars): ${input[0].content.substring(0, 200)}`);
+  }
+  
+  // Timeout đồng nhất cho TẤT CẢ models - tránh xử lý khác biệt
+  // Đảm bảo cả 2 model được xử lý giống hệt nhau
+  const upstreamTimeout = 120000; // 120s cho tất cả models - đồng nhất
 
   let buf = "";
   let eventCount = 0;
   const firstTypes = [];
 
+  // Request config đồng nhất - model chỉ là parameter trong payload
   const req = https.request(
     {
       hostname: "api.openai.com",
@@ -809,15 +889,28 @@ async function startUpstreamCore(sid, input) {
     },
     (resp) => {
       const ct = String(resp.headers["content-type"] || "");
-      if (DEBUG) console.log(`[${isoNow()}] upstream headers sid=${sid}: ${resp.statusCode} ${ct}`);
+      console.log(`[${isoNow()}] upstream headers sid=${sid} model=${modelToUse}: ${resp.statusCode} ${ct}`);
       broadcast(sid, "upstream", { status: resp.statusCode, ct });
+
+      // Kiểm tra status code - nếu không phải 200, có thể là lỗi
+      if (resp.statusCode !== 200) {
+        let raw = "";
+        resp.setEncoding("utf8");
+        resp.on("data", (c) => (raw += c));
+        resp.on("end", () => {
+          console.error(`[${isoNow()}] ❌ upstream error sid=${sid} model=${modelToUse} status=${resp.statusCode}: ${raw.slice(0, 500)}`);
+          broadcast(sid, "error", { error: `HTTP ${resp.statusCode}: ${raw.slice(0, 2000) || "Unknown error"}` });
+          finishJob(sid);
+        });
+        return;
+      }
 
       if (!ct.includes("text/event-stream")) {
         let raw = "";
         resp.setEncoding("utf8");
         resp.on("data", (c) => (raw += c));
         resp.on("end", () => {
-          console.log(`[${isoNow()}] upstream non-sse sid=${sid}: ${raw.slice(0, 400)}`);
+          console.error(`[${isoNow()}] ❌ upstream non-sse sid=${sid} model=${modelToUse}: ${raw.slice(0, 500)}`);
           broadcast(sid, "error", { error: raw.slice(0, 2000) || `HTTP ${resp.statusCode}` });
           finishJob(sid);
         });
@@ -826,8 +919,24 @@ async function startUpstreamCore(sid, input) {
 
       resp.setEncoding("utf8");
 
+      // Track thời gian nhận data đầu tiên
+      let firstDataReceived = false;
+      let firstDataTime = null;
+      
       resp.on("data", (chunk) => {
         buf += chunk;
+        
+        // QUAN TRỌNG: Cập nhật last_event_ts mỗi khi nhận data từ upstream
+        // Để tránh timeout nếu upstream chậm
+        job.last_event_ts = Date.now();
+        
+        // Log khi nhận data đầu tiên để debug
+        if (!firstDataReceived && buf.length > 0) {
+          firstDataReceived = true;
+          firstDataTime = Date.now();
+          const delay = firstDataTime - startTime;
+          console.log(`[${isoNow()}] ✅ upstream first data received sid=${sid} model=${modelToUse} delay=${delay}ms chunk_len=${chunk.length}`);
+        }
 
         while (true) {
           const endIdx = findSseBlockEnd(buf);
@@ -885,7 +994,8 @@ async function startUpstreamCore(sid, input) {
             if (delta) {
               job.stream_mode = "delta";
               job.reply += delta;
-              enqueueToken(sid, delta); // ✅ cadence
+              // Xử lý token đồng nhất - model chỉ là parameter, không ảnh hưởng logic
+              enqueueToken(sid, delta);
             }
 
             // 2) SNAPSHOT (secondary) chỉ khi CHƯA có delta
@@ -915,8 +1025,9 @@ async function startUpstreamCore(sid, input) {
 
             // 3) Errors / Done
             if (type === "response.error") {
-              console.log(`[${isoNow()}] upstream response.error sid=${sid}`);
-              broadcast(sid, "error", { error: JSON.stringify(ev).slice(0, 2000) });
+              const errorMsg = JSON.stringify(ev).slice(0, 500);
+              console.error(`[${isoNow()}] ❌ upstream response.error sid=${sid} model=${modelToUse}: ${errorMsg}`);
+              broadcast(sid, "error", { error: errorMsg });
               finishJob(sid);
               return;
             }
@@ -934,32 +1045,68 @@ async function startUpstreamCore(sid, input) {
       });
 
       resp.on("end", () => {
-        if (DEBUG)
+        const duration = Date.now() - startTime;
+        const hasReply = job.reply && job.reply.length > 0;
+        
+        if (!firstDataReceived) {
+          console.error(`[${isoNow()}] ❌ upstream end NO DATA sid=${sid} model=${modelToUse} duration=${duration}ms events=${eventCount}`);
+        } else {
+          const firstDataDelay = firstDataTime ? firstDataTime - startTime : 0;
           console.log(
-            `[${isoNow()}] upstream end sid=${sid} events=${eventCount} len=${job.reply.length} mode=${job.stream_mode}`
+            `[${isoNow()}] upstream end sid=${sid} model=${modelToUse} events=${eventCount} len=${job.reply.length} mode=${job.stream_mode} duration=${duration}ms first_data_delay=${firstDataDelay}ms`
           );
+        }
+        
+        // Nếu không có reply và không có data, báo lỗi
+        if (!hasReply && eventCount === 0) {
+          console.error(`[${isoNow()}] ❌ upstream end with NO REPLY sid=${sid} model=${modelToUse}`);
+          broadcast(sid, "error", { error: `Model ${modelToUse} không trả về dữ liệu. Có thể model không khả dụng hoặc tác vụ quá phức tạp.` });
+        }
+        
         finishJob(sid);
       });
 
       resp.on("error", (e) => {
-        console.log(`[${isoNow()}] upstream response error sid=${sid}: ${String(e?.message || e)}`);
-        broadcast(sid, "error", { error: `Response error: ${String(e?.message || e)}` });
+        const errMsg = String(e?.message || e);
+        const duration = Date.now() - startTime;
+        console.error(`[${isoNow()}] ❌ upstream response error sid=${sid} model=${modelToUse} duration=${duration}ms: ${errMsg}`);
+        broadcast(sid, "error", { error: `Response error: ${errMsg}` });
         finishJob(sid);
       });
 
       resp.on("close", () => {
-        if (DEBUG) console.log(`[${isoNow()}] upstream response closed sid=${sid}`);
-        // Nếu chưa done, finish job
-        const job = jobs.get(sid);
+        const duration = Date.now() - startTime;
+        const hasReply = job.reply && job.reply.length > 0;
+        
+        if (DEBUG || !hasReply) {
+          console.log(`[${isoNow()}] upstream response closed sid=${sid} model=${modelToUse} duration=${duration}ms has_reply=${hasReply}`);
+        }
+        
+        // Nếu chưa done và không có reply, báo lỗi
         if (job && !job.done) {
+          if (!hasReply && eventCount === 0) {
+            console.error(`[${isoNow()}] ❌ upstream closed with NO DATA sid=${sid} model=${modelToUse}`);
+            broadcast(sid, "error", { error: `Model ${modelToUse} đóng kết nối mà không trả về dữ liệu. Có thể model không khả dụng.` });
+          }
           finishJob(sid);
         }
       });
     }
   );
 
-  req.setTimeout(30000, () => {
-    console.log(`[${isoNow()}] upstream timeout sid=${sid}`);
+  // Timeout chung - model chỉ là parameter, không ảnh hưởng logic
+  req.setTimeout(upstreamTimeout, () => {
+    const duration = Date.now() - startTime;
+    const hasReply = job.reply && job.reply.length > 0;
+    console.error(`[${isoNow()}] ❌ upstream timeout sid=${sid} model=${modelToUse} after ${upstreamTimeout}ms duration=${duration}ms has_reply=${hasReply} events=${eventCount}`);
+    
+    // Nếu không có reply, báo lỗi rõ ràng
+    if (!hasReply) {
+      broadcast(sid, "error", { 
+        error: `Model ${modelToUse} timeout sau ${Math.round(upstreamTimeout/1000)}s không trả về dữ liệu. Có thể model không khả dụng hoặc tác vụ quá phức tạp.` 
+      });
+    }
+    
     try {
       req.destroy(new Error("upstream_timeout"));
     } catch {}
@@ -967,14 +1114,22 @@ async function startUpstreamCore(sid, input) {
 
   req.on("error", (e) => {
     const errMsg = String(e?.message || e);
-    console.log(`[${isoNow()}] upstream error sid=${sid}: ${errMsg}`);
+    const duration = Date.now() - startTime;
+    console.error(`[${isoNow()}] ❌ upstream request error sid=${sid} model=${modelToUse} duration=${duration}ms: ${errMsg}`);
     
     // Nếu là ECONNRESET hoặc connection error, thử finish job gracefully
     if (errMsg.includes("ECONNRESET") || errMsg.includes("ECONNREFUSED") || errMsg.includes("socket")) {
       console.log(`[${isoNow()}] connection reset for sid=${sid}, finishing job`);
     }
     
-    broadcast(sid, "error", { error: errMsg });
+    // Xử lý lỗi đồng nhất - không phân biệt model
+    // Model chỉ là parameter, không ảnh hưởng đến logic xử lý
+    if (errMsg.includes("model") || errMsg.includes("not found") || errMsg.includes("invalid")) {
+      console.error(`[${isoNow()}] ⚠️ Model ${modelToUse} có thể không tồn tại hoặc không được hỗ trợ`);
+      broadcast(sid, "error", { error: `Model ${modelToUse} không khả dụng hoặc không được hỗ trợ. Vui lòng chọn model khác.` });
+    } else {
+      broadcast(sid, "error", { error: errMsg });
+    }
     finishJob(sid);
   });
 
@@ -1010,9 +1165,9 @@ if (process.env.NODE_ENV === "production") {
   }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n✅ Backend API server running: http://localhost:${PORT}`);
-  console.log(`   Model: ${MODEL}`);
+  console.log(`   Models: ${AVAILABLE_MODELS.map(m => m.value).join(", ")}`);
   console.log(`   OpenAI API Key: [CONFIGURED]`);
   if (clerkClient) {
     console.log(`   Clerk: ✅ Enabled`);
@@ -1030,5 +1185,12 @@ app.listen(PORT, () => {
   } else {
     console.log(`   Mode: 🔧 Development`);
   }
+  console.log(`   Timeout: Disabled (no timeout)`);
+  console.log(`   Keep-Alive: 65s`);
   console.log();
 });
+
+// Cấu hình timeout cho server
+server.timeout = 0; // Disable timeout
+server.keepAliveTimeout = 65000; // 65 giây
+server.headersTimeout = 66000; // 66 giây

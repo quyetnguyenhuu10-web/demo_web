@@ -157,11 +157,6 @@ function AuthorizationGate({ children }) {
           .chat[data-react="true"] {
             display: flex !important;
           }
-          /* Ẩn HTML tĩnh nếu có (không nên có nữa) */
-          .topbar:not([data-react="true"]),
-          .app:not([data-react="true"]) {
-            display: none !important;
-          }
         `}</style>
         {/* Hiển thị ViewerNotice nếu user là readonly */}
         {isReadOnly && <ViewerNotice />}
@@ -179,8 +174,24 @@ export default function ClerkWrapper({ children, publishableKey }) {
   const clerkKey = String(publishableKey || "").trim();
   
   if (!clerkKey) {
-    console.warn("⚠️ ClerkWrapper: Missing publishableKey prop - returning children directly");
-    return <>{children}</>;
+    console.warn("⚠️ ClerkWrapper: Missing publishableKey prop - running in no-auth mode");
+    // Vẫn wrap trong ClerkProvider với dummy key để hooks hoạt động
+    // Clerk sẽ không authenticate nhưng hooks vẫn chạy được
+    return (
+      <ClerkProvider publishableKey="pk_test_dummy_key_for_no_auth_mode">
+        <SignedIn>
+          {children}
+        </SignedIn>
+        <SignedOut>
+          {children}
+        </SignedOut>
+      </ClerkProvider>
+    );
+  }
+
+  // Chỉ log khi debug
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_CLERK === "true") {
+    console.log("✅ ClerkWrapper: Initializing with key: [CONFIGURED]");
   }
 
   return (

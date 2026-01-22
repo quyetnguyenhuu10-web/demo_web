@@ -8,5 +8,8 @@
     "startCommand": "node server.cjs",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
+  },
+  "variables": {
+    "NODE_VERSION": "22.12.0"
   }
 }

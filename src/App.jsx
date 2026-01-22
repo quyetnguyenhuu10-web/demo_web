@@ -36,7 +36,7 @@ const CodeBlock = memo(function CodeBlock({ language, value, isDark }) {
     background: "var(--code-bg)",
     margin: 0,
     padding: "12px 14px",
-    borderRadius: 0,
+    borderRadius: "0 0 8px 8px", /* Bo góc dưới để khớp với wrapper */
     boxShadow: "none",
     overflow: "visible",
     overflowX: "visible",
@@ -88,8 +88,21 @@ const CodeBlock = memo(function CodeBlock({ language, value, isDark }) {
 // Custom Dropdown Component - mở lên trên
 const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
+
+  // Detect theme
+  useEffect(() => {
+    const checkTheme = () => {
+      const theme = document.documentElement.getAttribute('data-theme');
+      setIsDarkMode(theme === 'dark');
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Đóng dropdown khi click outside
   useEffect(() => {
@@ -158,7 +171,8 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
             right: 0,
             marginBottom: "4px",
             borderRadius: "8px", /* Đồng nhất với model selector */
-            boxShadow: "0 -4px 12px rgba(0,0,0,0.15)",
+            border: "1px solid var(--model-border-subtle)", /* Viền theo VS Code style */
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.30), 0 -2px 8px rgba(0,0,0,0.20)", /* Hiệu ứng nổi trên nền */
             zIndex: 1000,
             maxHeight: "200px",
             overflowY: "auto",
@@ -185,20 +199,29 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                   fontSize: "12px",
                   fontWeight: isSelected ? "700" : "500",
                   letterSpacing: "0.01em",
-                  color: "var(--topbar-fg)",
-                  transition: "color 0.2s ease, text-decoration 0.2s ease",
+                  color: isSelected 
+                    ? (isDarkMode ? "#ECE6DD" : "#1C1A17") 
+                    : (isDarkMode ? "var(--model-fg-muted)" : "rgba(28, 26, 23, 0.55)"), /* Màu chữ theo theme */
+                  transition: "color 0.2s ease, text-decoration 0.2s ease, text-decoration-color 0.2s ease",
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", "Roboto", system-ui, sans-serif',
-                  textDecoration: "none"
+                  textDecoration: isSelected ? "underline" : "none",
+                  textDecorationColor: isSelected 
+                    ? (isDarkMode ? "rgba(212, 183, 124, 0.55)" : "rgba(183, 159, 122, 0.60)") 
+                    : "transparent", /* Màu gạch chân theo theme */
+                  textDecorationThickness: "1.5px",
+                  textUnderlineOffset: "2px"
                 }}
                 onMouseEnter={(e) => {
                   const textSpan = e.currentTarget.querySelector('span:last-child');
-                  if (textSpan) {
-                    textSpan.style.color = "var(--model-hover-text)";
+                  if (textSpan && model.value !== selectedModel) {
+                    textSpan.style.color = isDarkMode ? "#ECE6DD" : "#1C1A17"; /* Màu chữ khi hover theo theme */
                     textSpan.style.textDecoration = "underline";
-                    textSpan.style.textShadow = "var(--model-hover-shadow)";
+                    textSpan.style.textDecorationColor = isDarkMode 
+                      ? "rgba(212, 183, 124, 0.55)" 
+                      : "rgba(183, 159, 122, 0.60)"; /* Màu gạch chân theo theme */
                     textSpan.style.textDecorationThickness = "1.5px";
                     textSpan.style.textUnderlineOffset = "2px";
                   }
@@ -206,13 +229,17 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                 onMouseLeave={(e) => {
                   const textSpan = e.currentTarget.querySelector('span:last-child');
                   if (textSpan) {
-                    textSpan.style.color = "var(--topbar-fg)";
-                    textSpan.style.textDecoration = "none";
-                    textSpan.style.textShadow = "none";
+                    textSpan.style.color = model.value === selectedModel 
+                      ? (isDarkMode ? "#ECE6DD" : "#1C1A17")
+                      : (isDarkMode ? "var(--model-fg-muted)" : "rgba(28, 26, 23, 0.55)");
+                    textSpan.style.textDecoration = model.value === selectedModel ? "underline" : "none";
+                    textSpan.style.textDecorationColor = model.value === selectedModel 
+                      ? (isDarkMode ? "rgba(212, 183, 124, 0.55)" : "rgba(183, 159, 122, 0.60)")
+                      : "transparent";
                   }
                 }}
               >
-                {/* Tick box - chỉ hiển thị khi selected */}
+                {/* Tick box - chỉ hiển thị khi selected, màu theo theme */}
                 {isSelected && (
                   <svg
                     width="14"
@@ -221,7 +248,7 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                     fill="none"
                     style={{
                       flexShrink: 0,
-                      color: "var(--model-tick)"
+                      color: isDarkMode ? "#D4B77C" : "#B79F7A" /* Màu tick theo theme */
                     }}
                   >
                     <path
@@ -237,7 +264,7 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                   <span style={{ width: "14px", flexShrink: 0 }}></span>
                 )}
                 <span style={{ 
-                  transition: "color 0.2s ease, text-decoration 0.2s ease, text-shadow 0.2s ease"
+                  transition: "color 0.2s ease, text-decoration 0.2s ease, text-decoration-color 0.2s ease"
                 }}>{model.label}</span>
               </button>
             );
@@ -339,8 +366,8 @@ const MarkdownRenderer = ({ content, isStreaming }) => {
               border: isDark
                 ? "1px solid rgba(255,255,255,0.10)"
                 : "1px solid rgba(0,0,0,0.10)",
-              background: isDark ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.04)",
-              color: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.86)",
+              background: isDark ? "#141210" : "rgba(0,0,0,0.04)", /* Đen ấm cho dark mode */
+              color: isDark ? "#ECE6DD" : "rgba(0,0,0,0.86)", /* Off-white ấm cho dark mode */
               fontFamily:
                 "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
               fontSize: "0.875rem",

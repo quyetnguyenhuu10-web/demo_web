@@ -152,14 +152,17 @@
       --model-accent-border: rgba(212,183,124,0.35);
       --model-accent-ring: rgba(212,183,124,0.20);
       --model-accent-hover: rgba(212,183,124,0.12);
-      /* Model selector background: solid, không trong suốt - nâu đen sâu cho light mode */
-      --model-bg: #e8dcc8; /* Nâu đen sâu, nghiêng về nâu cho light mode */
-      --model-bg-hover: #e0d2bc; /* Hover đậm hơn một chút */
-      /* Tick color: deep dark cho light mode */
-      --model-tick: #1c1a17;
-      /* Hover text color: giảm độ sáng 40% - beige-gold tối hơn */
-      --model-hover-text: #52432f; /* Beige-gold giảm độ sáng 40% từ #8a6f52 */
-      --model-hover-shadow: 0 1px 2px #3d3225, 0 0 4px #4a3d2b;
+      /* Model selector - Light mode colors */
+      --model-bg: #f0e6d6; /* Nền giấy ấm */
+      --model-bg-hover: #e8dcc8; /* Hover đậm hơn một chút */
+      /* Text colors - Light mode */
+      --model-fg-main: #1C1A17; /* Warm charcoal - đủ tương phản nhưng không đen gắt */
+      --model-fg-muted: rgba(28, 26, 23, 0.55); /* Chữ phụ - nhẹ, không gây nhiễu */
+      /* Tick và gạch chân - Light mode */
+      --model-tick: #B79F7A; /* Champagne/beige-gold nhạt - ấm, sang, nổi vừa đủ */
+      --model-underline: rgba(183, 159, 122, 0.60); /* Cùng hue với tick nhưng mờ hơn */
+      /* Border - Light mode */
+      --model-border-subtle: rgba(28, 26, 23, 0.10); /* Viền nhẹ nếu cần */
 
       /* ===== Scrollbar (LIGHT) ===== */
       --sb-track: rgba(28,26,23,0.06);
@@ -215,10 +218,13 @@
       --topbar-border: rgba(255,255,255,0.14);
       --topbar-glass: rgba(255,255,255,0.08);
 
-      /* Clock: sage / mint khói */
-      --clock-fg: #ece6dd;
-      --clock-icon: #9fb7a6;       /* sage */
-      --clock-border: rgba(159,183,166,0.40);
+      /* Clock: ĐEN HẲN - chuẩn editor cao cấp */
+      --clock-bg: #141210;         /* Đen ấm, cùng họ với panel/chat */
+      --clock-border: rgba(255,255,255,0.12); /* Viền */
+      --clock-fg: #ECE6DD;         /* Chữ giờ */
+      --clock-icon: rgba(236,230,221,0.75); /* Icon/kim đồng hồ */
+      --clock-accent: #9FB7A6;      /* Accent rất nhẹ (nếu cần) */
+      /* Legacy variables - giữ để tương thích */
       --clock-glass: rgba(159,183,166,0.14);
 
       /* Model selector accent (sage) */
@@ -226,14 +232,18 @@
       --model-accent-border: rgba(159,183,166,0.32);
       --model-accent-ring: rgba(159,183,166,0.24);
       --model-accent-hover: rgba(159,183,166,0.10);
-      /* Model selector background: solid, không trong suốt - nâu đen sâu, nghiêng nâu */
-      --model-bg: #1a1512; /* Nâu đen sâu, nghiêng về nâu */
-      --model-bg-hover: #1f1915; /* Hover sáng hơn một chút */
-      /* Tick color: warm white cho dark mode */
-      --model-tick: #ece6dd;
-      /* Hover text color: giảm độ sáng 40% - sage tối hơn */
-      --model-hover-text: #658a7a; /* Sage giảm độ sáng 40% từ #a8c5b3 */
-      --model-hover-shadow: 0 1px 3px #4d6b5d, 0 0 6px #5a7a6a;
+      /* Model selector - VS Code / Linear / Cursor style */
+      --model-fg-main: #ECE6DD; /* Text chính: off-white ấm */
+      --model-fg-muted: rgba(236,230,221,0.65); /* Text phụ */
+      --model-border-subtle: rgba(255,255,255,0.12); /* Viền */
+      --model-hover: rgba(255,255,255,0.08); /* Hover */
+      --model-active: rgba(255,255,255,0.12); /* Active */
+      --model-accent: #9FB7A6; /* Accent: sage khói */
+      /* Background: đen sâu premium */
+      --model-bg: #0a0a0a; /* Đen sâu */
+      --model-bg-hover: #0d0d0d; /* Hover sáng hơn một chút */
+      /* Tick color */
+      --model-tick: #ECE6DD;
 
       /* ===== Scrollbar (DARK) ===== */
       --sb-track: rgba(236,230,221,0.06);
@@ -616,9 +626,10 @@
       padding: 0 28px 0 12px;          /* chừa chỗ cho caret */
       border-radius: 8px;               /* Bo tròn nhẹ hơn */
 
-      border: 1px solid var(--topbar-border);
-      background: var(--model-bg); /* Màu solid, không trong suốt */
-      color: var(--topbar-fg);
+      border: 1px solid var(--model-border-subtle); /* Viền theo VS Code style */
+      background: var(--model-bg); /* Đen sâu premium */
+      color: var(--model-fg-main); /* Text chính off-white ấm */
+      box-shadow: 0 3px 12px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.20); /* Hiệu ứng nổi mặc định */
 
       font-size: 12px;
       font-weight: 700;
@@ -627,10 +638,9 @@
       cursor: pointer;
       user-select: none;
 
-      box-shadow: none;
       outline: none;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", "Roboto", system-ui, sans-serif;
-      transition: background 0.2s ease;
+      transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
       min-width: 120px;
       line-height: 1;
       display: block !important;
@@ -639,10 +649,16 @@
       z-index: 10;
     }
 
-    /* Hover: màu solid đậm hơn, không trong suốt */
+    /* Hover: theo VS Code style */
     .modelSelector:hover:not(:disabled) {
-      background: var(--model-bg-hover);
-      border-color: var(--topbar-border);
+      background: var(--model-hover); /* rgba(255,255,255,0.08) */
+      box-shadow: 0 4px 16px rgba(0,0,0,0.40), 0 3px 8px rgba(0,0,0,0.25);
+      border-color: var(--model-border-subtle);
+    }
+    
+    /* Active: theo VS Code style */
+    .modelSelector:active:not(:disabled) {
+      background: var(--model-active); /* rgba(255,255,255,0.12) */
     }
 
     /* Focus: ring mềm với màu accent */
@@ -675,13 +691,14 @@
 
     /* Dark mode - dùng CSS variables tự động, không cần override riêng */
 
-    /* Custom dropdown list styles - đồng nhất với theme */
+    /* Custom dropdown list styles - VS Code style */
     .modelDropdownList {
       scrollbar-width: thin;
       scrollbar-color: var(--sb-thumb) var(--sb-track);
-      background: var(--model-bg); /* Màu solid, không trong suốt */
-      border: 1px solid var(--topbar-border);
-      color: var(--topbar-fg);
+      background: var(--model-bg); /* Đen sâu premium */
+      border: 1px solid var(--model-border-subtle); /* Viền theo VS Code style */
+      color: var(--model-fg-main); /* Text chính */
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.30), 0 -2px 8px rgba(0,0,0,0.20);
     }
 
     .modelDropdownList::-webkit-scrollbar {
@@ -883,7 +900,7 @@
       border-radius:999px;
 
       border: 1px solid var(--clock-border);
-      background: var(--clock-glass);
+      background: var(--clock-bg, var(--clock-glass)); /* Dùng --clock-bg nếu có, fallback về --clock-glass */
       color: var(--clock-fg);
 
       font-size: 12px;
@@ -1180,20 +1197,26 @@
     }
 
     :root[data-theme="dark"]{
-      --code-bg: #1e1e1e;              /* VS Code Dark+ surface */
-      --code-border: #333;
-      --code-header-bg: #252526;
-      --code-header-fg: #d4d4d4;
+      /* Code block - ĐEN HẲN, đúng tông */
+      --code-bg: #141210;              /* Đen ấm, cùng hệ với panel/chat */
+      --code-border: rgba(255,255,255,0.10); /* Viền nhẹ, chỉ để tách khối */
+      --code-header-bg: #121110;       /* Header đậm hơn 1 nấc */
+      --code-header-fg: #ECE6DD;       /* Chữ off-white ấm */
       --code-copy-bg: transparent;
-      --code-copy-fg: #d4d4d4;
+      --code-copy-fg: #ECE6DD;         /* Chữ off-white ấm */
+      /* Syntax colors */
+      --code-text: #ECE6DD;            /* Chữ code base - off-white ấm */
+      --code-comment: rgba(236,230,221,0.55); /* Comment - dịu xuống nhưng cùng hue */
+      --code-keyword: #9FB7A6;         /* Keyword - sage khói, không xanh gắt */
+      --code-string: #D4B77C;          /* String/literal - champagne */
     }
 
     /* Wrapper của code block */
     .codeBlock{
       background: var(--code-bg);
       border: 1px solid var(--code-border);
-      border-radius: 12px;
-      overflow: visible;
+      border-radius: 8px; /* Bo góc rõ ràng hơn */
+      overflow: hidden; /* Đảm bảo bo góc hoạt động đúng */
       box-shadow: none;
     }
 
@@ -1206,8 +1229,11 @@
       background: var(--code-header-bg);
       color: var(--code-header-fg);
       border-bottom: 1px solid var(--code-border);
+      border-radius: 8px 8px 0 0; /* Bo góc trên để khớp với wrapper */
       position: relative;
       z-index: 10;
+      min-height: 48px; /* Height cố định để tránh giãn */
+      box-sizing: border-box; /* Đảm bảo padding tính trong height */
     }
 
     .codeLangTag{
@@ -1236,6 +1262,11 @@
       pointer-events: auto;
       user-select: none;
       -webkit-user-select: none;
+      min-width: 60px; /* Width cố định để tránh nhảy khi text thay đổi */
+      height: 28px; /* Height cố định để tránh code block bị giãn */
+      line-height: 1; /* Line height cố định */
+      justify-content: center; /* Căn giữa text */
+      box-sizing: border-box; /* Đảm bảo padding tính trong height */
     }
     .codeCopyBtn:hover{
       background: rgba(127,127,127,0.12);
@@ -1249,7 +1280,7 @@
       margin: 0 !important;
       background: var(--code-bg) !important;
       border: 0 !important;
-      border-radius: 0 !important;
+      border-radius: 0 0 8px 8px !important; /* Bo góc dưới để khớp với wrapper */
       box-shadow: none !important;
       overflow: visible !important;
       max-height: none !important;
@@ -1258,6 +1289,32 @@
 
     .codeBlock pre code{
       background: transparent !important;
+      color: var(--code-text, #ECE6DD) !important; /* Chữ code base */
+    }
+
+    /* Override syntax highlighting colors cho dark mode */
+    :root[data-theme="dark"] .codeBlock pre code .token.comment,
+    :root[data-theme="dark"] .codeBlock pre code .token.prolog,
+    :root[data-theme="dark"] .codeBlock pre code .token.doctype,
+    :root[data-theme="dark"] .codeBlock pre code .token.cdata {
+      color: var(--code-comment, rgba(236,230,221,0.55)) !important;
+    }
+
+    :root[data-theme="dark"] .codeBlock pre code .token.keyword,
+    :root[data-theme="dark"] .codeBlock pre code .token.selector,
+    :root[data-theme="dark"] .codeBlock pre code .token.attr-name,
+    :root[data-theme="dark"] .codeBlock pre code .token.property,
+    :root[data-theme="dark"] .codeBlock pre code .token.class-name,
+    :root[data-theme="dark"] .codeBlock pre code .token.function {
+      color: var(--code-keyword, #9FB7A6) !important; /* Sage khói */
+    }
+
+    :root[data-theme="dark"] .codeBlock pre code .token.string,
+    :root[data-theme="dark"] .codeBlock pre code .token.char,
+    :root[data-theme="dark"] .codeBlock pre code .token.attr-value,
+    :root[data-theme="dark"] .codeBlock pre code .token.regex,
+    :root[data-theme="dark"] .codeBlock pre code .token.variable {
+      color: var(--code-string, #D4B77C) !important; /* Champagne */
     }
 
     /* Inline code (không phải block) */

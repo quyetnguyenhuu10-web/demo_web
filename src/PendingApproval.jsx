@@ -139,8 +139,27 @@ export default function PendingApproval() {
           fontSize: "0.875rem",
           color: "var(--muted)"
         }}>
-          <p style={{ margin: 0 }}>
+          <p style={{ margin: 0, marginBottom: "0.5rem" }}>
             Vui lòng liên hệ quản trị viên để được phê duyệt tài khoản.
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong>Email quản trị viên:</strong>{" "}
+            <a 
+              href="mailto:quyetnguyenhuu10@gmail.com"
+              style={{
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontWeight: 500
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.textDecoration = "underline";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.textDecoration = "none";
+              }}
+            >
+              quyetnguyenhuu10@gmail.com
+            </a>
           </p>
         </div>
       </div>

@@ -414,7 +414,11 @@ if (process.env.CLERK_SECRET_KEY) {
     
     console.log("✅ Clerk middleware enabled");
   } catch (e) {
-    console.warn("⚠️ Failed to load Clerk middleware:", e.message);
+    // Chỉ log warning nếu CLERK_SECRET_KEY được set (có nghĩa là user muốn dùng Clerk)
+    if (process.env.CLERK_SECRET_KEY) {
+      console.warn("⚠️ Failed to load Clerk middleware:", e.message);
+      console.warn("   Install dependencies: npm install @clerk/clerk-sdk-node @clerk/backend");
+    }
   }
 } else {
   console.warn("⚠️ CLERK_SECRET_KEY is not set. Skipping Clerk authentication.");

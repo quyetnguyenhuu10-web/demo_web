@@ -5,3 +5,17 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* FORCE: dùng đúng theme variables (SSOT) */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  overflow: hidden;
+}

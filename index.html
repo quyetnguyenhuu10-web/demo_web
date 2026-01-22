@@ -14,11 +14,11 @@
       const root = document.documentElement;
       
       try {
-        // 1. Apply theme trước
+        // 1. Apply theme trước - Patch B: mặc định light (không theo system)
         const THEME_KEY = "ui_theme";
         const saved = localStorage.getItem(THEME_KEY);
-        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved === "dark" || saved === "light" ? saved : (systemDark ? "dark" : "light");
+        // Mặc định light mode để tránh UI tối om khi chưa có React render
+        const theme = saved === "dark" || saved === "light" ? saved : "light";
         root.setAttribute("data-theme", theme);
         
         // 2. Apply topbar height từ ideal (rem) - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
@@ -82,7 +82,7 @@
   <!-- CSS chính - script trên đã set inline style cho CSS variables -->
   <style>
     :root{
-      /* Warm paper base */
+      /* Warm paper base - Light mode default */
       --bg: #f5f1ea;         /* nền chính: giấy ấm */
       --bg-soft: #f7f3ed;    /* pane trái */
       --pane: #f1ece4;
@@ -215,7 +215,7 @@
 
     *{ box-sizing:border-box; }
 
-    html, body{
+    html, body, #root{
       height:100%;
       width:100%;
       margin:0;
@@ -223,12 +223,18 @@
     }
 
     body{
-      background:var(--bg);
+      background:var(--bg, #f5f1ea); /* Fallback sáng nếu CSS chưa load */
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      color:var(--text);
+      color:var(--text, #1c1a17); /* Fallback text color */
       overflow:hidden;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Đảm bảo #root có background nếu React chưa render */
+    #root {
+      background:var(--bg, #f5f1ea);
+      min-height: 100%;
     }
 
     /* ===== Topbar layout: clean (no system log) ===== */
@@ -1126,87 +1132,7 @@
 </head>
 
 <body>
-  <div class="topbar">
-    <!-- Left: Clock -->
-    <div class="tbLeft">
-      <div id="clockWidget" class="clockWidget" aria-label="Clock">
-        <svg class="clockSvg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8" opacity="0.95"></circle>
-          <path class="clockHand" d="M12 12 L12 6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-          <path d="M12 12 L16.2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.65"></path>
-        </svg>
-        <span id="clockTime">--:--:--</span>
-      </div>
-    </div>
-
-    <!-- Center: empty on purpose (no system log) -->
-    <div class="tbCenter" aria-hidden="true"></div>
-
-    <!-- Right: Cursor-like theme toggle -->
-    <div class="tbRight">
-      <button id="themeToggle" class="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
-        <span class="themeThumb" aria-hidden="true"></span>
-
-        <!-- Sun (Lucide-like) -->
-        <svg class="themeIcon sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M12 2.3v2.2M12 19.5v2.2M4.5 12H2.3M21.7 12h-2.2
-                   M5.4 5.4l-1.6-1.6M20.2 20.2l-1.6-1.6
-                   M18.6 5.4l1.6-1.6M3.8 20.2l1.6-1.6"
-                stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-
-        <!-- Moon (Lucide-like) -->
-        <svg class="themeIcon moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M21 13.1A7.6 7.6 0 0 1 10.9 3.0
-                   a7.2 7.2 0 1 0 10.1 10.1Z"
-                stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Nếu bạn đang dùng kéo-resize topbar thì giữ lại -->
-    <div id="topbarResizer" class="topbarResizer" role="separator" aria-orientation="horizontal" aria-label="Resize topbar"></div>
-  </div>
-
-  <div class="app">
-    <div class="leftPane">
-      <div class="coming">
-        <div class="badge">Coming soon</div>
-        <h1>Workspace</h1>
-        <p>Phần workspace / sidebar để sau. Hiện tập trung làm chat panel.</p>
-      </div>
-    </div>
-
-    <aside class="chat">
-      <div id="chatResizer" class="chatResizer" role="separator" aria-orientation="vertical" aria-label="Resize chat"></div>
-      <div class="wrap">
-        <div class="scrollArea" id="scrollArea">
-          <div class="messages" id="messages">
-          </div>
-        </div>
-
-        <div class="bar">
-          <div class="chatComposer">
-            <textarea id="ta" class="chatComposerInput" placeholder="Nhập câu hỏi..." spellcheck="false"></textarea>
-
-            <button id="send" class="chatSend" type="button" aria-label="Send" disabled>
-              <svg class="sendIcon" viewBox="0 0 24 24" fill="none">
-                <path d="M4 12L20 4L13 20L11 13L4 12Z"
-                      stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-
-  <!-- Mount React với Clerk authentication -->
+  <div id="root"></div>
   <script type="module" src="/src/main-clerk.jsx"></script>
 </body>
 </html>

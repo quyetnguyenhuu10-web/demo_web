@@ -833,13 +833,9 @@ export default function App() {
   // Khởi tạo theme ngay khi component mount
   useEffect(() => {
     const THEME_KEY = "ui_theme";
-    const getSystemTheme = () => {
-      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-    };
+    // Patch C: Mặc định light (không theo system theme)
     const saved = localStorage.getItem(THEME_KEY);
-    const theme = saved === "dark" || saved === "light" ? saved : getSystemTheme();
+    const theme = saved === "dark" || saved === "light" ? saved : "light";
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
   
@@ -1026,6 +1022,19 @@ export default function App() {
         let startIdealRem = 2.0;
         let activePointerId = null;
         
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
+        };
+        
         const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
           
@@ -1071,19 +1080,6 @@ export default function App() {
           e.preventDefault();
         });
         
-        const endDrag = () => {
-          if (!dragging) return;
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          
-          // Remove listeners từ document
-          document.removeEventListener("pointermove", handlePointerMove);
-          document.removeEventListener("pointerup", handlePointerUp);
-          
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
-        };
-        
         grip.addEventListener("pointercancel", endDrag);
         window.addEventListener("blur", endDrag);
       };
@@ -1106,6 +1102,19 @@ export default function App() {
         let startIdealVw = 28;
         let activePointerId = null;
         
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
+        };
+        
         const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
           
@@ -1126,19 +1135,6 @@ export default function App() {
           if (activePointerId != null && e.pointerId !== activePointerId) return;
           endDrag();
           e.preventDefault();
-        };
-        
-        const endDrag = () => {
-          if (!dragging) return;
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          
-          // Remove listeners từ document
-          document.removeEventListener("pointermove", handlePointerMove);
-          document.removeEventListener("pointerup", handlePointerUp);
-          
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
         };
         
         grip.addEventListener("pointerdown", (e) => {
@@ -1232,8 +1228,8 @@ export default function App() {
 
   return (
     <>
-      {/* React App - thay thế HTML tĩnh */}
-      <div className="topbar" data-react="true">
+      {/* React App */}
+      <div className="topbar">
         {/* Left: Clock */}
         <div className="tbLeft">
           <div id="clockWidget" className="clockWidget" aria-label="Clock">
@@ -1290,7 +1286,7 @@ export default function App() {
         <div id="topbarResizer" className="topbarResizer" role="separator" aria-orientation="horizontal" aria-label="Resize topbar"></div>
       </div>
 
-      <div className="app" data-react="true">
+      <div className="app">
         <div className="leftPane">
           <div className="coming">
             <div className="badge">Coming soon</div>

@@ -1,7 +1,11 @@
 // web_ui/server.cjs - Backend API server
 // Đọc config từ biến môi trường (.env)
 
-require("dotenv").config();
+const path = require("path");
+const fs = require("fs");
+
+// Load .env file từ cùng thư mục với server.cjs
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 // Khai báo DEBUG ngay từ đầu để tránh temporal dead zone
 const DEBUG = process.env.DEBUG === "true" || false;
@@ -10,8 +14,6 @@ const https = require("https");
 const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 
 // ---------------- Đọc danh sách model từ file ---------------- 
 let AVAILABLE_MODELS = [];
@@ -64,9 +66,19 @@ if (DEBUG || process.env.LOG_PROMPT === "true") {
 console.log(`✅ Available models: ${AVAILABLE_MODELS.map(m => m.value).join(", ")}`);
 console.log(`✅ Default model: ${DEFAULT_MODEL}`);
 
+// Debug: Log để kiểm tra key có được load không (chỉ hiện 4 ký tự đầu)
+if (DEBUG) {
+  const keyPreview = OPENAI_KEY ? `${OPENAI_KEY.substring(0, 4)}...` : "NOT SET";
+  console.log(`[DEBUG] OPENAI_API_KEY: ${keyPreview}`);
+}
+
 if (!OPENAI_KEY) {
   console.error("❌ Missing OPENAI_API_KEY in .env file");
   console.error("   Tạo file .env và thêm: OPENAI_API_KEY=sk-...");
+  console.error(`   Current working directory: ${process.cwd()}`);
+  console.error(`   Looking for .env at: ${path.join(__dirname, ".env")}`);
+  const envExists = fs.existsSync(path.join(__dirname, ".env"));
+  console.error(`   .env file exists: ${envExists}`);
   process.exit(1);
 }
 

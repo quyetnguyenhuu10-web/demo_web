@@ -196,34 +196,10 @@ export default function ClerkWrapper({ children, publishableKey }) {
 
   return (
     <ClerkProvider publishableKey={clerkKey}>
-      {/* State 0: Unauthenticated */}
+      {/* State 0: Unauthenticated - hiển thị UI bình thường, SignIn/SignUp trong sidebar */}
       <SignedOut>
-        <style>{`
-          .app { display: none !important; }
-          .topbar { display: none !important; }
-        `}</style>
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "var(--bg, #f5f1ea)",
-          gap: "2rem",
-          padding: "2rem",
-          flexWrap: "wrap",
-          zIndex: 9999
-        }}>
-          <div style={{ maxWidth: "400px", width: "100%" }}>
-            <SignIn routing="hash" />
-          </div>
-          <div style={{ maxWidth: "400px", width: "100%" }}>
-            <SignUp routing="hash" />
-          </div>
-        </div>
+        {/* Không ẩn app - để sidebar hiển thị SignIn/SignUp */}
+        {children}
       </SignedOut>
       
       {/* State 1 & 2: Authenticated - Kiểm tra authorization */}

@@ -7,6 +7,7 @@ import { useUser } from "@clerk/clerk-react";
 import { UI_CONFIG, buildApiUrl, buildApiHeaders, buildStreamUrl } from "./config.js";
 import { requireAuthorization, checkAuthorization } from "./auth-utils.js";
 import Toast from "./Toast.jsx";
+import SidebarMenu from "./SidebarMenu.jsx";
 
 const FOLLOW_BOTTOM_THRESHOLD_PX = 140;
 
@@ -1431,14 +1432,17 @@ export default function App() {
       </div>
 
       <div className="app" data-react="true">
+        {/* Phần 1: Sidebar menu (200px) */}
         <div className="leftPane">
-          <div className="coming">
-            <div className="badge">Coming soon</div>
-            <h1>Workspace</h1>
-            <p>Phần workspace / sidebar để sau. Hiện tập trung làm chat panel.</p>
-          </div>
+          <SidebarMenu />
         </div>
 
+        {/* Phần 2: Phần giữa (fill khoảng trống) */}
+        <div className="middlePane">
+          {/* Phần giữa trống, có thể thêm nội dung sau */}
+        </div>
+
+        {/* Phần 3: Chat panel */}
         <aside className="chat" data-react="true">
           <div id="chatResizer" className="chatResizer" role="separator" aria-orientation="vertical" aria-label="Resize chat"></div>
           <div className="wrap">

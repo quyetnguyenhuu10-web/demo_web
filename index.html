@@ -254,26 +254,39 @@
     *{ box-sizing:border-box; }
 
     html, body, #root{
-      height:100%;
-      width:100%;
-      margin:0;
-      padding:0;
+      height:100% !important;
+      width:100% !important;
+      margin:0 !important;
+      padding:0 !important;
+      overflow: hidden !important;
+    }
+
+    html {
+      overflow: hidden !important;
     }
 
     body{
-      background:var(--bg);
+      background:var(--bg) !important;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color:var(--text);
-      overflow:hidden;
+      overflow:hidden !important;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
     }
     
     /* Đảm bảo #root hiển thị và fill viewport */
     #root {
-      height: 100%;
-      width: 100%;
+      height: 100vh !important;
+      width: 100vw !important;
       display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      position: relative !important;
     }
     
     /* Đảm bảo UI elements hiển thị (backup rule) */
@@ -290,18 +303,21 @@
     /* ===== Topbar layout: clean (no system log) ===== */
     .topbar{
       position:relative;
-      height: var(--topbar-h, 28px); /* Fallback để tránh layout shift */
+      height: var(--topbar-h, 28px) !important; /* Fallback để tránh layout shift */
+      width: 100% !important;
+      max-width: 100% !important;
       background: linear-gradient(180deg, var(--topbar-a), var(--topbar-b));
       color: var(--topbar-fg);
       border-bottom: 1px solid var(--topbar-border);
       /* Tránh layout shift khi load */
       contain: layout style;
       box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      margin: 0 !important;
+      padding: 0 var(--topbar-pad-x, 10px) !important;
 
-      display:grid;
+      display:grid !important;
       grid-template-columns: 1fr 0fr 1fr;
       align-items:center;
-      padding: 0 var(--topbar-pad-x, 10px);
     }
 
     .tbLeft{ justify-self:start; display:flex; align-items:center; }
@@ -309,24 +325,40 @@
     .tbRight{ justify-self:end; display:flex; align-items:center; gap:10px; }
 
     .app{
-      height: calc(100vh - var(--topbar-h, 28px)); /* Fallback để tránh layout shift */
-      height: calc(100dvh - var(--topbar-h, 28px));
-      width:100%;
-      display:flex;
-      overflow:hidden;
+      height: calc(100vh - var(--topbar-h, 28px)) !important; /* Fallback để tránh layout shift */
+      height: calc(100dvh - var(--topbar-h, 28px)) !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      display:flex !important;
+      gap: 0 !important; /* Không có gap */
+      overflow:hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
       /* Tránh layout shift khi load */
       contain: layout;
     }
 
+    /* Phần giữa - fill khoảng trống */
+    .middlePane{
+      flex: 1 1 auto; /* Fill khoảng trống còn lại */
+      min-width: 0;
+      background: var(--bg); /* Nền chính */
+      overflow: hidden;
+    }
+
     .leftPane{
-      flex:1 1 auto;
-      min-width:0;
+      width: 200px; /* Width cố định 200px */
+      min-width: 200px;
+      max-width: 200px;
+      flex-shrink: 0; /* Không co lại */
       background:var(--bg-soft);
       display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:24px;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
       border-right:1px solid var(--border);
+      margin: 0; /* Không có margin */
+      padding: 0; /* Padding được handle bởi sidebarMenu */
     }
 
     .coming{
@@ -376,6 +408,7 @@
       width: var(--chat-w, 380px); /* Fallback để tránh layout shift */
       min-width: var(--chat-min-w, 280px);
       max-width: var(--chat-max-w, 560px);
+      flex-shrink: 0; /* Không co lại */
 
       height:100%;
       min-height:0;
@@ -1333,6 +1366,263 @@
     }
     .codeBlock pre::-webkit-scrollbar { 
       display: none;
+    }
+
+    /* ===== Sidebar Menu ===== */
+    .sidebarMenu {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      box-sizing: border-box; /* Padding tính trong width */
+      position: relative;
+    }
+
+    /* List section (phần trên) */
+    .sidebarListSection {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+      min-height: 0;
+    }
+
+    /* Separator line */
+    .sidebarSeparator {
+      height: 1px;
+      background: var(--border);
+      margin: 12px 0;
+      flex-shrink: 0;
+    }
+
+    /* User profile section (phần dưới) - y hệt như hình, gần đáy */
+    .sidebarUserProfile {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px 0;
+      flex-shrink: 0;
+      background: transparent;
+      margin-top: auto; /* Đẩy xuống gần đáy */
+    }
+
+    .sidebarUserInfoRow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebarUserAvatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: rgba(255,255,255,0.1); /* Nền xám đậm hơn một chút */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sidebarAvatarImg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .sidebarAvatarPlaceholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff; /* Chữ trắng */
+      background: transparent;
+    }
+
+    .sidebarUserText {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebarUserName {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text); /* Màu trắng */
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebarUserSubInfo {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted); /* Màu xám nhẹ hơn */
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* User actions (đăng xuất) */
+    .sidebarUserActions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sidebarSignOutBtn {
+      width: 100%;
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      font-family: inherit;
+    }
+
+    .sidebarSignOutBtn:hover {
+      background: var(--hover, rgba(255,255,255,0.08));
+      border-color: var(--border-soft);
+    }
+
+    /* Auth switch link */
+    .sidebarAuthSwitch {
+      margin-top: 12px;
+    }
+
+    .sidebarAuthSwitch a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .sidebarAuthSwitch a:hover {
+      text-decoration: underline;
+    }
+
+    /* Auth section khi chưa đăng nhập */
+    .sidebarAuthSection {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebarAuthHeader {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .sidebarAuthTitle {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 8px 0;
+    }
+
+    .sidebarAuthSubtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .sidebarAuthForms {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebarSignIn {
+      width: 100%;
+    }
+
+    /* Clerk components styling - override để fit sidebar */
+    .sidebarAuthForms [data-clerk-element] {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .sidebarAuthForms .cl-rootBox {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .sidebarAuthForms .cl-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      background: var(--panel) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 8px !important;
+      padding: 16px !important;
+      box-shadow: none !important;
+    }
+
+    .sidebarAuthForms .cl-headerTitle {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      color: var(--text) !important;
+    }
+
+    .sidebarAuthForms .cl-headerSubtitle {
+      font-size: 12px !important;
+      color: var(--muted) !important;
+    }
+
+    .sidebarAuthForms .cl-formButtonPrimary {
+      background: var(--accent) !important;
+      color: var(--text) !important;
+      border-radius: 6px !important;
+      font-weight: 600 !important;
+      transition: background 0.2s ease !important;
+    }
+
+    .sidebarAuthForms .cl-formButtonPrimary:hover {
+      opacity: 0.9 !important;
+    }
+
+    .sidebarAuthForms .cl-formFieldInput {
+      background: var(--bg-soft) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      color: var(--text) !important;
+    }
+
+    .sidebarAuthForms .cl-footerActionLink {
+      color: var(--accent) !important;
+    }
+
+    /* Scrollbar cho sidebar */
+    .leftPane::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .leftPane::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .leftPane::-webkit-scrollbar-thumb {
+      background: var(--sb-thumb);
+      border-radius: 3px;
+    }
+
+    .leftPane::-webkit-scrollbar-thumb:hover {
+      background: var(--sb-thumb-hover);
+    }
+
+    .leftPane {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sb-thumb) transparent;
     }
   </style>
 </head>

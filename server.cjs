@@ -384,10 +384,23 @@ function finishJob(sid) {
   setTimeout(() => jobs.delete(sid), 120000);
 }
 
-// ---------------- Clerk Auth Middleware ----------------
+// ---------------- Clerk Auth Middleware (Optional) ----------------
 let clerkMiddleware = null;
 let clerkClient = null;
-if (process.env.CLERK_SECRET_KEY) {
+
+// Kiểm tra xem có Clerk dependencies không (không throw error nếu không có)
+function hasClerkDependencies() {
+  try {
+    require.resolve("@clerk/clerk-sdk-node");
+    require.resolve("@clerk/backend");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Chỉ load Clerk nếu có dependencies VÀ có CLERK_SECRET_KEY
+if (process.env.CLERK_SECRET_KEY && hasClerkDependencies()) {
   try {
     const { ClerkExpressRequireAuth } = require("@clerk/clerk-sdk-node");
     clerkMiddleware = ClerkExpressRequireAuth({
@@ -414,14 +427,18 @@ if (process.env.CLERK_SECRET_KEY) {
     
     console.log("✅ Clerk middleware enabled");
   } catch (e) {
-    // Chỉ log warning nếu CLERK_SECRET_KEY được set (có nghĩa là user muốn dùng Clerk)
-    if (process.env.CLERK_SECRET_KEY) {
-      console.warn("⚠️ Failed to load Clerk middleware:", e.message);
-      console.warn("   Install dependencies: npm install @clerk/clerk-sdk-node @clerk/backend");
-    }
+    console.warn("⚠️ Failed to load Clerk middleware:", e.message);
+    console.warn("   Server will continue without Clerk authentication.");
   }
 } else {
-  console.warn("⚠️ CLERK_SECRET_KEY is not set. Skipping Clerk authentication.");
+  // Không có Clerk - server vẫn chạy bình thường
+  if (process.env.CLERK_SECRET_KEY && !hasClerkDependencies()) {
+    // Có CLERK_SECRET_KEY nhưng không có dependencies
+    console.warn("⚠️ CLERK_SECRET_KEY is set but Clerk dependencies are not installed.");
+    console.warn("   To enable Clerk: npm install @clerk/clerk-sdk-node @clerk/backend");
+    console.warn("   Server will continue without Clerk authentication.");
+  }
+  // Không có CLERK_SECRET_KEY - không cần log gì, server chạy bình thường
 }
 
 // ---------------- ABAC Authorization Middleware ----------------

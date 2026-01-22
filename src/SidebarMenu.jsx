@@ -1,11 +1,9 @@
-// SidebarMenu.jsx - Menu sidebar với đăng nhập/đăng ký Clerk
-import { SignedIn, SignedOut, SignIn, SignUp, SignOutButton, useUser } from "@clerk/clerk-react";
-import { useState } from "react";
+// SidebarMenu.jsx - Menu sidebar với user profile
+import { SignedIn, SignedOut, SignOutButton, useUser } from "@clerk/clerk-react";
 
 // Component khi có Clerk (dùng hooks)
 function ClerkSidebarMenu() {
   const { user, isLoaded } = useUser();
-  const [authMode, setAuthMode] = useState("signin"); // "signin" hoặc "signup"
 
   // Lấy initials từ tên user
   const getInitials = (user) => {
@@ -92,148 +90,10 @@ function ClerkSidebarMenu() {
         </div>
       </SignedIn>
 
-      {/* Khi chưa đăng nhập */}
+      {/* Khi chưa đăng nhập - không hiển thị gì trong sidebar */}
       <SignedOut>
-        <div className="sidebarAuthSection">
-          <div className="sidebarAuthHeader">
-            <h2 className="sidebarAuthTitle">Đăng nhập</h2>
-            <p className="sidebarAuthSubtitle">Đăng nhập để sử dụng ứng dụng</p>
-          </div>
-          <div className="sidebarAuthForms">
-            {authMode === "signin" ? (
-              <>
-                <SignIn 
-                  routing="hash"
-                  appearance={{
-                    elements: {
-                      rootBox: {
-                        width: "100%",
-                        maxWidth: "100%"
-                      },
-                      card: {
-                        width: "100%",
-                        maxWidth: "100%",
-                        background: "var(--panel)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        padding: "16px",
-                        boxShadow: "none"
-                      },
-                      headerTitle: {
-                        fontSize: "16px",
-                        fontWeight: "700",
-                        color: "var(--text)"
-                      },
-                      headerSubtitle: {
-                        fontSize: "12px",
-                        color: "var(--muted)"
-                      },
-                      socialButtonsBlockButton: {
-                        borderRadius: "6px",
-                        fontWeight: "600"
-                      },
-                      formButtonPrimary: {
-                        background: "var(--accent)",
-                        color: "var(--text)",
-                        borderRadius: "6px",
-                        fontWeight: "600"
-                      },
-                      formFieldInput: {
-                        background: "var(--bg-soft)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                        color: "var(--text)"
-                      },
-                      footerActionLink: {
-                        color: "var(--accent)"
-                      }
-                    }
-                  }}
-                />
-                <div className="sidebarAuthSwitch">
-                  <p style={{ fontSize: "12px", color: "var(--muted)", margin: "8px 0 0 0", textAlign: "center" }}>
-                    Chưa có tài khoản?{" "}
-                    <a 
-                      href="#sign-up" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setAuthMode("signup");
-                      }}
-                      style={{ color: "var(--accent)", textDecoration: "none", cursor: "pointer" }}
-                    >
-                      Đăng ký
-                    </a>
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <SignUp 
-                  routing="hash"
-                  appearance={{
-                    elements: {
-                      rootBox: {
-                        width: "100%",
-                        maxWidth: "100%"
-                      },
-                      card: {
-                        width: "100%",
-                        maxWidth: "100%",
-                        background: "var(--panel)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        padding: "16px",
-                        boxShadow: "none"
-                      },
-                      headerTitle: {
-                        fontSize: "16px",
-                        fontWeight: "700",
-                        color: "var(--text)"
-                      },
-                      headerSubtitle: {
-                        fontSize: "12px",
-                        color: "var(--muted)"
-                      },
-                      socialButtonsBlockButton: {
-                        borderRadius: "6px",
-                        fontWeight: "600"
-                      },
-                      formButtonPrimary: {
-                        background: "var(--accent)",
-                        color: "var(--text)",
-                        borderRadius: "6px",
-                        fontWeight: "600"
-                      },
-                      formFieldInput: {
-                        background: "var(--bg-soft)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                        color: "var(--text)"
-                      },
-                      footerActionLink: {
-                        color: "var(--accent)"
-                      }
-                    }
-                  }}
-                />
-                <div className="sidebarAuthSwitch">
-                  <p style={{ fontSize: "12px", color: "var(--muted)", margin: "8px 0 0 0", textAlign: "center" }}>
-                    Đã có tài khoản?{" "}
-                    <a 
-                      href="#sign-in" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setAuthMode("signin");
-                      }}
-                      style={{ color: "var(--accent)", textDecoration: "none", cursor: "pointer" }}
-                    >
-                      Đăng nhập
-                    </a>
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
+        <div className="sidebarListSection">
+          {/* Sidebar trống khi chưa đăng nhập */}
         </div>
       </SignedOut>
     </div>

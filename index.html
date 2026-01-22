@@ -1519,6 +1519,154 @@
       gap: 16px;
     }
 
+    /* ===== Auth Modal (cửa sổ đăng nhập ở giữa màn hình) ===== */
+    .authModalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Overlay background - phù hợp với theme */
+    :root .authModalOverlay {
+      background: rgba(28, 26, 23, 0.4); /* Light mode: warm charcoal mờ */
+    }
+
+    :root[data-theme="dark"] .authModalOverlay {
+      background: rgba(0, 0, 0, 0.6); /* Dark mode: đen mờ hơn */
+    }
+
+    .authModalContainer {
+      width: 400px;
+      min-height: 300px;
+      max-height: 90vh;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Box shadow - phù hợp với theme */
+    :root .authModalContainer {
+      box-shadow: 
+        0 4px 16px rgba(28, 26, 23, 0.12),
+        0 8px 32px rgba(28, 26, 23, 0.08);
+    }
+
+    :root[data-theme="dark"] .authModalContainer {
+      box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.4),
+        0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .authModalSwitch {
+      padding: 0 20px 20px 20px;
+    }
+
+    .authModalSwitch a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s ease;
+    }
+
+    .authModalSwitch a:hover {
+      text-decoration: underline;
+      opacity: 0.8;
+    }
+
+    /* Clerk components styling trong modal - phù hợp với theme */
+    .authModalContainer .cl-rootBox {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .authModalContainer .cl-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      background: var(--panel) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 8px !important;
+      padding: 20px !important;
+      box-shadow: none !important;
+    }
+
+    .authModalContainer .cl-headerTitle {
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      color: var(--text) !important;
+    }
+
+    .authModalContainer .cl-headerSubtitle {
+      font-size: 13px !important;
+      color: var(--muted) !important;
+    }
+
+    .authModalContainer .cl-socialButtonsBlockButton {
+      background: var(--bg-soft) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      color: var(--text) !important;
+      font-weight: 600 !important;
+      transition: background 0.2s ease, border-color 0.2s ease !important;
+    }
+
+    .authModalContainer .cl-socialButtonsBlockButton:hover {
+      background: var(--panel-soft) !important;
+      border-color: var(--border-soft) !important;
+    }
+
+    .authModalContainer .cl-formButtonPrimary {
+      background: var(--accent) !important;
+      color: var(--text) !important;
+      border-radius: 6px !important;
+      font-weight: 600 !important;
+      transition: opacity 0.2s ease !important;
+    }
+
+    .authModalContainer .cl-formButtonPrimary:hover {
+      opacity: 0.9 !important;
+    }
+
+    .authModalContainer .cl-formFieldInput {
+      background: var(--bg-soft) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      color: var(--text) !important;
+    }
+
+    .authModalContainer .cl-formFieldInput:focus {
+      border-color: var(--accent) !important;
+      outline: none !important;
+    }
+
+    .authModalContainer .cl-footerActionLink {
+      color: var(--accent) !important;
+    }
+
+    .authModalContainer .cl-footerActionLink:hover {
+      opacity: 0.8 !important;
+    }
+
+    /* Responsive cho modal */
+    @media (max-width: 480px) {
+      .authModalContainer {
+        width: calc(100vw - 32px);
+        max-width: 400px;
+      }
+    }
+
     .sidebarAuthHeader {
       text-align: center;
       margin-bottom: 8px;

@@ -5,6 +5,7 @@ import { checkAuthorization } from "./auth-utils.js";
 import { buildApiUrl, buildApiHeaders } from "./config.js";
 import PendingApproval from "./PendingApproval.jsx";
 import ViewerNotice from "./ViewerNotice.jsx";
+import AuthModal from "./AuthModal.jsx";
 
 // Component kiểm tra authorization sau khi đã signed in
 function AuthorizationGate({ children }) {
@@ -197,9 +198,10 @@ export default function ClerkWrapper({ children, publishableKey }) {
 
   return (
     <ClerkProvider publishableKey={clerkKey}>
-      {/* State 0: Unauthenticated - hiển thị UI bình thường, SignIn/SignUp trong sidebar */}
+      {/* State 0: Unauthenticated - hiển thị modal đăng nhập ở giữa màn hình */}
       <SignedOut>
-        {/* Không ẩn app - để sidebar hiển thị SignIn/SignUp */}
+        <AuthModal />
+        {/* Vẫn hiển thị app nhưng có modal overlay */}
         {children}
       </SignedOut>
       

@@ -459,20 +459,23 @@ const DEFAULT_MODELS = [
 const MODEL_STORAGE_KEY = "ai_agent_selected_model";
 
 export default function App() {
-  // ClerkWrapper đã wrap app với ClerkProvider (kể cả khi không có key thật)
-  // Nên có thể dùng useUser hook an toàn
-  // Nếu không có Clerk key, ClerkWrapper sẽ không wrap với ClerkProvider
-  // Nhưng vì main-clerk.jsx luôn render với ClerkWrapper, nên hooks sẽ hoạt động
+  // Kiểm tra xem có Clerk key không
+  const hasClerkKey = typeof import.meta !== 'undefined' && 
+    Boolean(import.meta.env?.VITE_CLERK_PUBLISHABLE_KEY?.trim());
+  
+  // Chỉ dùng useUser nếu có Clerk key (ClerkWrapper đã wrap với ClerkProvider)
   let user = null;
   let getTokenFromHook = null;
   
-  try {
-    const userData = useUser();
-    user = userData.user;
-    getTokenFromHook = userData.getToken;
-  } catch (e) {
-    // Nếu Clerk chưa sẵn sàng (không có ClerkProvider), dùng giá trị mặc định
-    console.warn("Clerk not available in App (no ClerkProvider):", e);
+  if (hasClerkKey) {
+    try {
+      const userData = useUser();
+      user = userData.user;
+      getTokenFromHook = userData.getToken;
+    } catch (e) {
+      // Nếu Clerk chưa sẵn sàng, dùng giá trị mặc định
+      console.warn("Clerk not available in App:", e);
+    }
   }
   
   // Fallback getToken function

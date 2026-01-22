@@ -175,20 +175,9 @@ export default function ClerkWrapper({ children, publishableKey }) {
   const clerkKey = String(publishableKey || "").trim();
   
   if (!clerkKey) {
-    console.warn("⚠️ ClerkWrapper: Missing publishableKey prop - running in no-auth mode");
-    // Vẫn wrap trong ClerkProvider với dummy key để hooks hoạt động
-    // Clerk sẽ không authenticate nhưng hooks vẫn chạy được
-    // SidebarMenu và App sẽ kiểm tra hasClerkKey để hiển thị UI phù hợp
-    return (
-      <ClerkProvider publishableKey="pk_test_dummy_key_for_no_auth_mode">
-        <SignedIn>
-          {children}
-        </SignedIn>
-        <SignedOut>
-          {children}
-        </SignedOut>
-      </ClerkProvider>
-    );
+    // Không có Clerk key - render app trực tiếp không có authentication
+    console.warn("⚠️ ClerkWrapper: Missing publishableKey - running in no-auth mode");
+    return <>{children}</>;
   }
 
   // Chỉ log khi debug

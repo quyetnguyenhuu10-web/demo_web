@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useUser } from "@clerk/clerk-react";
 import { UI_CONFIG, buildApiUrl, buildApiHeaders, buildStreamUrl } from "./config.js";
 import { requireAuthorization, checkAuthorization } from "./auth-utils.js";
@@ -122,9 +124,51 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
   );
 };
 
-// Component để render Markdown - render ngay lập tức, không delay
+// Component để render Markdown - với syntax highlighting và copy button
 const MarkdownRenderer = ({ content, isStreaming }) => {
-  // Render markdown ngay lập tức, ReactMarkdown đủ nhanh
+  const [copiedCodeBlocks, setCopiedCodeBlocks] = useState({});
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return document.documentElement.getAttribute("data-theme") === "dark" ||
+           (!document.documentElement.getAttribute("data-theme") && 
+            window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  });
+  
+  // Listen theme changes real-time
+  useEffect(() => {
+    const updateTheme = () => {
+      const theme = document.documentElement.getAttribute("data-theme");
+      const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setIsDark(theme === "dark" || (!theme && systemDark));
+    };
+    
+    // Check immediately
+    updateTheme();
+    
+    // Listen for theme attribute changes
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"]
+    });
+    
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+    if (mediaQuery) {
+      mediaQuery.addEventListener("change", updateTheme);
+    }
+    
+    return () => {
+      observer.disconnect();
+      if (mediaQuery) {
+        mediaQuery.removeEventListener("change", updateTheme);
+      }
+    };
+  }, []);
+  
+  // Dùng theme chuẩn của react-syntax-highlighter thay vì tự bịa
+  // oneDark và oneLight đã được import sẵn
+  
   return (
     <ReactMarkdown 
       remarkPlugins={[remarkGfm]}
@@ -133,32 +177,213 @@ const MarkdownRenderer = ({ content, isStreaming }) => {
         p: ({ children }) => <p style={{ margin: "0 0 0.8em 0" }}>{children}</p>,
         code: ({ node, inline, className, children, ...props }) => {
           const match = /language-(\w+)/.exec(className || '');
-          return inline ? (
-            <code style={{ 
-              background: "rgba(0,0,0,0.05)", 
-              padding: "2px 4px", 
-              borderRadius: "3px",
-              fontSize: "0.9em"
-            }} {...props}>
-              {children}
-            </code>
-          ) : (
-            <code className={className} {...props}>
-              {children}
-            </code>
+          const language = match ? match[1] : '';
+          const codeString = String(children).replace(/\n$/, '');
+          
+          if (inline) {
+            return (
+              <code style={{ 
+                background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", 
+                padding: "3px 6px", 
+                borderRadius: "4px",
+                fontSize: "0.9em",
+                fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace",
+                color: isDark ? "#d4d4d4" : "#1a1a1a",
+                border: isDark 
+                  ? "1px solid rgba(255,255,255,0.08)" 
+                  : "1px solid rgba(0,0,0,0.06)",
+                fontWeight: "500"
+              }} {...props}>
+                {children}
+              </code>
+            );
+          }
+          
+          // Nếu đang streaming, render code block dạng thô để tránh giật/nhảy
+          if (isStreaming) {
+            return (
+              <pre
+                style={{
+                  margin: "1em 0",
+                  padding: "12px 14px",
+                  borderRadius: "8px",
+                  maxWidth: "100%",
+                  border: isDark
+                    ? "1px solid rgba(255,255,255,0.10)"
+                    : "1px solid rgba(0,0,0,0.10)",
+                  background: isDark ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.04)",
+                  color: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.86)",
+                  fontFamily:
+                    "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
+                  fontSize: "0.875rem",
+                  lineHeight: "1.55",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  overflowWrap: "break-word",
+                }}
+              >
+                {codeString}
+              </pre>
+            );
+          }
+          
+          // CodeId đơn giản để track copy state
+          const codeId = `${language || "text"}-${codeString.substring(0, 20)}`;
+          
+          return (
+            <div 
+              style={{ 
+                position: "relative", 
+                margin: "1em 0",
+                borderRadius: "8px",
+                border: isDark 
+                  ? "1px solid rgba(255,255,255,0.1)" 
+                  : "1px solid rgba(0,0,0,0.08)",
+                boxShadow: isDark
+                  ? "0 2px 8px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)"
+                  : "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
+                background: isDark ? "#1e1e1e" : "#f8f8f8"
+              }}
+            >
+              {/* Header bar với language và copy button */}
+              <div style={{ 
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "8px 12px",
+                background: isDark 
+                  ? "rgba(255,255,255,0.03)" 
+                  : "rgba(0,0,0,0.02)",
+                borderBottom: isDark
+                  ? "1px solid rgba(255,255,255,0.08)"
+                  : "1px solid rgba(0,0,0,0.06)",
+                minHeight: "36px"
+              }}>
+                {language && (
+                  <span style={{
+                    fontSize: "0.75rem",
+                    fontWeight: "500",
+                    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
+                    padding: "4px 8px",
+                    background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                    borderRadius: "4px",
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px"
+                  }}>
+                    {language}
+                  </span>
+                )}
+                {!language && <span></span>}
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(codeString);
+                      setCopiedCodeBlocks(prev => ({ ...prev, [codeId]: true }));
+                      setTimeout(() => {
+                        setCopiedCodeBlocks(prev => {
+                          const next = { ...prev };
+                          delete next[codeId];
+                          return next;
+                        });
+                      }, 2000);
+                    } catch (e) {
+                      console.error("Failed to copy:", e);
+                    }
+                  }}
+                  style={{
+                    background: copiedCodeBlocks[codeId]
+                      ? (isDark ? "rgba(76, 175, 80, 0.2)" : "rgba(76, 175, 80, 0.15)")
+                      : (isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"),
+                    border: "none",
+                    borderRadius: "4px",
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    fontSize: "0.75rem",
+                    fontWeight: "500",
+                    color: copiedCodeBlocks[codeId]
+                      ? (isDark ? "#4caf50" : "#2e7d32")
+                      : (isDark ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.8)"),
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    transition: "all 0.2s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!copiedCodeBlocks[codeId]) {
+                      e.target.style.background = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!copiedCodeBlocks[codeId]) {
+                      e.target.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+                    }
+                  }}
+                  title={copiedCodeBlocks[codeId] ? "Copied!" : "Copy code"}
+                >
+                  {copiedCodeBlocks[codeId] ? (
+                    <>
+                      <span>✓</span>
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>⧉</span>
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%"
+                }}
+              >
+                <SyntaxHighlighter
+                  language={language || 'text'}
+                  style={isDark ? oneDark : oneLight}
+                  showLineNumbers={false}
+                  wrapLines={false}
+                  wrapLongLines={false}
+                  customStyle={{
+                    margin: 0,
+                    padding: "14px 16px",
+                    borderRadius: 0,
+                    fontSize: "0.875rem",
+                    lineHeight: "1.6",
+                    fontFamily: "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
+                    background: "transparent",
+                    fontWeight: 450,
+                    WebkitFontSmoothing: "antialiased",
+                    MozOsxFontSmoothing: "grayscale",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    overflowWrap: "break-word"
+                  }}
+                  PreTag="div"
+                  codeTagProps={{
+                    style: {
+                      fontFamily: "'SF Mono','Monaco','Inconsolata','Roboto Mono','Source Code Pro',monospace",
+                      display: "block",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word"
+                    }
+                  }}
+                  {...props}
+                >
+                  {codeString}
+                </SyntaxHighlighter>
+              </div>
+            </div>
           );
         },
-        pre: ({ children }) => (
-          <pre style={{ 
-            background: "rgba(0,0,0,0.05)", 
-            padding: "12px", 
-            borderRadius: "6px",
-            overflow: "auto",
-            margin: "0.8em 0"
-          }}>
-            {children}
-          </pre>
-        ),
+        pre: ({ children }) => {
+          // pre tag sẽ được xử lý bởi code component, chỉ cần return children
+          return <>{children}</>;
+        },
         ul: ({ children }) => <ul style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ul>,
         ol: ({ children }) => <ol style={{ margin: "0.8em 0", paddingLeft: "1.5em" }}>{children}</ol>,
         li: ({ children }) => <li style={{ margin: "0.3em 0" }}>{children}</li>,
@@ -229,6 +454,29 @@ export default function App() {
   const [status, setStatus] = useState("ready"); // ready | creating | streaming | error
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState([]);
+  
+  // useEffect để tự động reset textarea về kích thước ban đầu khi input empty
+  // Chạy ngay khi input thay đổi thành empty
+  useEffect(() => {
+    if (!input || input.trim() === "") {
+      // Dùng nhiều cách để đảm bảo reset chắc chắn
+      const resetTextarea = () => {
+        const textarea = document.getElementById("ta");
+        if (textarea && (!textarea.value || textarea.value.trim() === "")) {
+          textarea.style.height = "24px";
+        }
+      };
+      
+      // Reset ngay lập tức
+      resetTextarea();
+      
+      // Reset lại sau các frame để đảm bảo
+      requestAnimationFrame(() => {
+        resetTextarea();
+        setTimeout(() => resetTextarea(), 0);
+      });
+    }
+  }, [input]);
   
   // State để track copy button (turnId -> copied)
   const [copiedStates, setCopiedStates] = useState({});
@@ -304,7 +552,7 @@ export default function App() {
   // streaming refs
   const esRef = useRef(null);
   const activeRef = useRef({ turnId: null });
-  const renderKeyRef = useRef(0); // Key để force re-render Markdown
+  // Removed renderKeyRef - không cần remount MarkdownRenderer mỗi token
 
   // scroll behavior refs - đơn giản hóa, chỉ track user scroll
   const userScrollLockedRef = useRef(false);
@@ -358,6 +606,7 @@ export default function App() {
   const scrollToBottomImmediate = () => {
     const sa = scrollAreaRef.current;
     if (!sa) return;
+    
     markProgrammaticScroll();
     sa.scrollTop = sa.scrollHeight;
   };
@@ -448,17 +697,15 @@ export default function App() {
           const tid = activeRef.current.turnId;
           if (!tid) return;
 
-          // Cập nhật trực tiếp state, không đệm
+          // Cập nhật trực tiếp state, không đệm - KHÔNG thêm renderKey
           setTurns((prev) => {
-            const updated = prev.map(t => {
+            return prev.map(t => {
               if (t.id === tid) {
                 const newText = (t.assistant || "") + tok;
-                renderKeyRef.current += 1;
-                return { ...t, assistant: newText, renderKey: renderKeyRef.current };
+                return { ...t, assistant: newText };
               }
               return t;
             });
-            return updated;
           });
 
           // Chỉ tự động scroll nếu có đủ không gian
@@ -529,6 +776,24 @@ export default function App() {
     setTurns((prev) => prev.concat([{ id: turnId, user: text, assistant: "" }]));
 
     setInput("");
+    
+    // Reset textarea về kích thước ban đầu NGAY LẬP TỨC sau khi gửi tin nhắn
+    // Dùng nhiều cách để đảm bảo reset chắc chắn
+    const resetTextarea = () => {
+      const textarea = document.getElementById("ta");
+      if (textarea) {
+        textarea.style.height = "24px"; // Reset về kích thước ban đầu
+      }
+    };
+    
+    // Reset ngay lập tức
+    resetTextarea();
+    
+    // Reset lại sau các frame để đảm bảo
+    requestAnimationFrame(() => {
+      resetTextarea();
+      setTimeout(() => resetTextarea(), 0);
+    });
 
     // Không tự động scroll khi tạo turn mới - chỉ scroll nếu gần bottom
     requestAnimationFrame(() => {
@@ -678,139 +943,251 @@ export default function App() {
       initClockFunc();
     };
     
+    // ===== Constraint-based lite sizing =====
+    const SIZE_KEYS = {
+      topbar: "ui_topbar_ideal_rem",
+      chat: "ui_chat_ideal_vw",
+    };
+
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+    function getRemPx() {
+      const fs = getComputedStyle(document.documentElement).fontSize;
+      const n = parseFloat(fs || "16");
+      return Number.isFinite(n) ? n : 16;
+    }
+
+    function getVwPx() {
+      return window.innerWidth / 100;
+    }
+
+    function readNumberLS(key, fallback) {
+      const raw = localStorage.getItem(key);
+      const n = raw == null ? NaN : parseFloat(raw);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function writeNumberLS(key, val) {
+      localStorage.setItem(key, String(val));
+    }
+
+    function applyTopbarFromIdeal(idealRem) {
+      const TOPBAR_MIN_PX = 20;
+      const TOPBAR_MAX_PX = 56;
+
+      const remPx = getRemPx();
+      const idealPx = idealRem * remPx;
+      const actualPx = clamp(idealPx, TOPBAR_MIN_PX, TOPBAR_MAX_PX);
+
+      const root = document.documentElement;
+      root.style.setProperty("--topbar-h", `${actualPx}px`);
+      // pill scale theo actual, không theo px cứng
+      const pill = Math.max(16, Math.min(34, Math.round(actualPx * 0.64)));
+      root.style.setProperty("--topbar-pill-h", `${pill}px`);
+    }
+
+    function applyChatFromIdeal(idealVw) {
+      const CHAT_MIN_PX = 280;
+      const CHAT_MAX_PX = 560;
+
+      const vwPx = getVwPx();
+      const idealPx = idealVw * vwPx;
+      const actualPx = clamp(idealPx, CHAT_MIN_PX, CHAT_MAX_PX);
+
+      document.documentElement.style.setProperty("--chat-w", `${actualPx}px`);
+    }
+
+    function restoreIdealsAndApply() {
+      // Default ideal: topbar ~ 2.0rem, chat ~ 28vw
+      const idealTopbarRem = readNumberLS(SIZE_KEYS.topbar, 2.0);
+      const idealChatVw = readNumberLS(SIZE_KEYS.chat, 28);
+
+      applyTopbarFromIdeal(idealTopbarRem);
+      applyChatFromIdeal(idealChatVw);
+    }
+
     // Khởi tạo topbar và chat resizers
     const initResizers = () => {
       // Topbar resizer
-      const TOPBAR_SIZE_KEY = "ui_topbar_h";
       const TOPBAR_MIN = 20;
       const TOPBAR_MAX = 56;
-      const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-      const getTopbarHPx = () => {
-        const v = getComputedStyle(document.documentElement).getPropertyValue("--topbar-h").trim();
-        const n = parseInt(v, 10);
-        return Number.isFinite(n) ? n : 28;
-      };
-      const pillHeightForTopbar = (h) => Math.max(16, Math.min(34, Math.round(h * 0.64)));
-      const applyTopbarSizePx = (h) => {
-        const clamped = clamp(h, TOPBAR_MIN, TOPBAR_MAX);
-        const root = document.documentElement;
-        root.style.setProperty("--topbar-h", `${clamped}px`);
-        root.style.setProperty("--topbar-pill-h", `${pillHeightForTopbar(clamped)}px`);
-        localStorage.setItem(TOPBAR_SIZE_KEY, String(clamped));
-      };
-      const restoreTopbarSize = () => {
-        const saved = parseInt(localStorage.getItem(TOPBAR_SIZE_KEY) || "", 10);
-        if (Number.isFinite(saved)) applyTopbarSizePx(saved);
-      };
+      
       const initTopbarResizer = () => {
         const grip = document.getElementById("topbarResizer");
-        if (!grip) return;
-        restoreTopbarSize();
+        if (!grip) {
+          console.warn("⚠️ Topbar resizer element not found");
+          return;
+        }
+        console.log("✅ Initializing topbar resizer");
+        
         let dragging = false;
         let startY = 0;
-        let startH = 0;
+        let startPx = 0;
+        let startIdealRem = 2.0;
         let activePointerId = null;
-        const onMove = (clientY) => {
-          const dy = clientY - startY;
-          const next = startH + dy;
-          applyTopbarSizePx(next);
-        };
-        const endDrag = () => {
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
-        };
-        grip.addEventListener("pointerdown", (e) => {
-          if (e.isPrimary === false) return;
-          dragging = true;
-          activePointerId = e.pointerId;
-          startY = e.clientY;
-          startH = getTopbarHPx();
-          document.documentElement.setAttribute("data-resizing", "topbar");
-          try { grip.setPointerCapture(e.pointerId); } catch {}
-          e.preventDefault();
-        });
-        grip.addEventListener("pointermove", (e) => {
+        
+        const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
-          onMove(e.clientY);
+          
+          const dy = e.clientY - startY;
+          const nextPx = startPx + dy;
+          
+          const remPx = getRemPx();
+          const nextIdealRem = nextPx / remPx;
+          
+          writeNumberLS(SIZE_KEYS.topbar, nextIdealRem);
+          applyTopbarFromIdeal(nextIdealRem);
+          
           e.preventDefault();
-        });
-        grip.addEventListener("pointerup", (e) => {
+          e.stopPropagation();
+        };
+        
+        const handlePointerUp = (e) => {
           if (activePointerId != null && e.pointerId !== activePointerId) return;
           endDrag();
           e.preventDefault();
+        };
+        
+        grip.addEventListener("pointerdown", (e) => {
+          if (e.isPrimary === false) return;
+          console.log("🖱️ Topbar resizer pointerdown");
+          dragging = true;
+          activePointerId = e.pointerId;
+          
+          const remPx = getRemPx();
+          // lấy actual hiện tại từ CSS var --topbar-h (px)
+          const curPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 28;
+          startPx = curPx;
+          startIdealRem = readNumberLS(SIZE_KEYS.topbar, curPx / remPx);
+          
+          startY = e.clientY;
+          document.documentElement.setAttribute("data-resizing", "topbar");
+          
+          // Attach listeners to document để bắt mọi movement
+          document.addEventListener("pointermove", handlePointerMove);
+          document.addEventListener("pointerup", handlePointerUp);
+          
+          try { grip.setPointerCapture(e.pointerId); } catch {}
+          e.preventDefault();
         });
+        
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
+        };
+        
         grip.addEventListener("pointercancel", endDrag);
         window.addEventListener("blur", endDrag);
       };
       
       // Chat resizer
-      const CHAT_W_KEY = "ui_chat_w";
       const CHAT_MIN = 280;
       const CHAT_MAX = 560;
-      const getChatWPx = () => {
-        const v = getComputedStyle(document.documentElement).getPropertyValue("--chat-w").trim();
-        const n = parseInt(v, 10);
-        return Number.isFinite(n) ? n : 380;
-      };
-      const applyChatWidthPx = (w) => {
-        const clamped = clamp(w, CHAT_MIN, CHAT_MAX);
-        document.documentElement.style.setProperty("--chat-w", `${clamped}px`);
-        localStorage.setItem(CHAT_W_KEY, String(clamped));
-      };
-      const restoreChatWidth = () => {
-        const saved = parseInt(localStorage.getItem(CHAT_W_KEY) || "", 10);
-        if (Number.isFinite(saved)) applyChatWidthPx(saved);
-      };
+      
       const initChatResizer = () => {
         const grip = document.getElementById("chatResizer");
-        if (!grip) return;
-        restoreChatWidth();
+        if (!grip) {
+          console.warn("⚠️ Chat resizer element not found");
+          return;
+        }
+        console.log("✅ Initializing chat resizer");
+        
         let dragging = false;
         let startX = 0;
-        let startW = 0;
+        let startPx = 380;
+        let startIdealVw = 28;
         let activePointerId = null;
-        const onMove = (clientX) => {
-          const dx = startX - clientX;
-          const next = startW + dx;
-          applyChatWidthPx(next);
-        };
-        const endDrag = () => {
-          dragging = false;
-          document.documentElement.removeAttribute("data-resizing");
-          try { grip.releasePointerCapture?.(activePointerId); } catch {}
-          activePointerId = null;
-        };
-        grip.addEventListener("pointerdown", (e) => {
-          if (e.isPrimary === false) return;
-          dragging = true;
-          activePointerId = e.pointerId;
-          startX = e.clientX;
-          startW = getChatWPx();
-          document.documentElement.setAttribute("data-resizing", "chat");
-          try { grip.setPointerCapture(e.pointerId); } catch {}
-          e.preventDefault();
-        });
-        grip.addEventListener("pointermove", (e) => {
+        
+        const handlePointerMove = (e) => {
           if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
-          onMove(e.clientX);
+          
+          const dx = startX - e.clientX;     // logic: kéo trái tăng width
+          const nextPx = startPx + dx;
+          
+          const vwPx = getVwPx();
+          const nextIdealVw = nextPx / vwPx;
+          
+          writeNumberLS(SIZE_KEYS.chat, nextIdealVw);
+          applyChatFromIdeal(nextIdealVw);
+          
           e.preventDefault();
-        });
-        grip.addEventListener("pointerup", (e) => {
+          e.stopPropagation();
+        };
+        
+        const handlePointerUp = (e) => {
           if (activePointerId != null && e.pointerId !== activePointerId) return;
           endDrag();
           e.preventDefault();
+        };
+        
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.documentElement.removeAttribute("data-resizing");
+          
+          // Remove listeners từ document
+          document.removeEventListener("pointermove", handlePointerMove);
+          document.removeEventListener("pointerup", handlePointerUp);
+          
+          try { grip.releasePointerCapture?.(activePointerId); } catch {}
+          activePointerId = null;
+        };
+        
+        grip.addEventListener("pointerdown", (e) => {
+          if (e.isPrimary === false) return;
+          console.log("🖱️ Chat resizer pointerdown");
+          dragging = true;
+          activePointerId = e.pointerId;
+          
+          const curPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--chat-w")) || 380;
+          startPx = curPx;
+          
+          const vwPx = getVwPx();
+          startIdealVw = readNumberLS(SIZE_KEYS.chat, curPx / vwPx);
+          
+          startX = e.clientX;
+          document.documentElement.setAttribute("data-resizing", "chat");
+          
+          // Attach listeners to document để bắt mọi movement
+          document.addEventListener("pointermove", handlePointerMove);
+          document.addEventListener("pointerup", handlePointerUp);
+          
+          try { grip.setPointerCapture(e.pointerId); } catch {}
+          e.preventDefault();
         });
+        
         grip.addEventListener("pointercancel", endDrag);
         window.addEventListener("blur", endDrag);
       };
+      
+      // Khởi tạo ideals và apply constraints
+      restoreIdealsAndApply();
       
       // Chờ DOM render xong
       setTimeout(() => {
         initTopbarResizer();
         initChatResizer();
       }, 100);
+      
+      // Re-apply constraints khi resize cửa sổ
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const idealTopbarRem = readNumberLS(SIZE_KEYS.topbar, 2.0);
+          const idealChatVw = readNumberLS(SIZE_KEYS.chat, 28);
+          applyTopbarFromIdeal(idealTopbarRem);
+          applyChatFromIdeal(idealChatVw);
+        }, 100);
+      });
     };
     
     // Chờ DOM render xong rồi init - dùng requestAnimationFrame để đảm bảo DOM đã render
@@ -946,9 +1323,15 @@ export default function App() {
                   userScrollLockedRef.current = true;
                 }
               }}
-              onWheel={markUserScrollIntent}
-              onTouchStart={markUserScrollIntent}
-              onTouchMove={markUserScrollIntent}
+              onWheel={(e) => {
+                markUserScrollIntent();
+              }}
+              onTouchStart={(e) => {
+                markUserScrollIntent();
+              }}
+              onTouchMove={(e) => {
+                markUserScrollIntent();
+              }}
               onPointerDown={(e) => {
                 if (e && e.isPrimary === false) return;
                 userPointerDownRef.current = true;
@@ -995,7 +1378,7 @@ export default function App() {
                         <div className="thinkingText">Đang suy nghĩ...</div>
                       ) : (
                         <MarkdownRenderer 
-                          key={`${t.id}-${t.renderKey || 0}`}
+                          key={t.id}
                           content={t.assistant || ""}
                           isStreaming={activeRef.current.turnId === t.id && status === "streaming"}
                         />
@@ -1033,21 +1416,46 @@ export default function App() {
                   value={input}
                   rows={1}
                   style={{ 
-                    minHeight: "24px", /* Min-height phù hợp */
-                    maxHeight: "150px", /* Giảm max-height để không quá cao */
+                    minHeight: "24px",
+                    maxHeight: "150px",
                     resize: "none",
                     overflowY: "auto",
-                    height: "24px", /* Set height cố định ban đầu */
-                    lineHeight: "1.5", /* Line-height chuẩn */
-                    padding: "0" /* Không padding - để CSS làm việc */
+                    height: input === "" ? "24px" : "auto", // Tự động về 24px khi empty
+                    lineHeight: "1.5",
+                    padding: "0",
+                    boxSizing: "border-box", // Quan trọng: đảm bảo height tính đúng
+                    transition: "none" // Tắt transition để tránh nhảy
                   }}
                   onChange={(e) => {
-                    setInput(e.target.value);
-                    // Auto-resize textarea - giới hạn chặt chẽ hơn
+                    const newValue = e.target.value;
+                    setInput(newValue);
+                    
+                    // Auto-resize textarea - TỰ ĐỘNG quay về kích cỡ ban đầu khi không có chữ
                     const textarea = e.target;
+                    
+                    // Nếu không có chữ (empty hoặc chỉ có whitespace), reset ngay về 24px
+                    if (!newValue || newValue.trim() === "") {
+                      textarea.style.height = "24px";
+                      return;
+                    }
+                    
+                    // Lưu scroll position trước khi resize
+                    const scrollTop = textarea.scrollTop;
+                    // Reset height về auto để tính lại chính xác
                     textarea.style.height = "auto";
+                    // Tính height mới (tối thiểu 24px, tối đa 150px)
                     const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 150);
+                    // Set height mới
                     textarea.style.height = newHeight + "px";
+                    // Restore scroll position
+                    textarea.scrollTop = scrollTop;
+                  }}
+                  onBlur={(e) => {
+                    // Khi mất focus, nếu không có chữ thì reset về kích thước ban đầu
+                    const textarea = e.target;
+                    if (!textarea.value || textarea.value.trim() === "") {
+                      textarea.style.height = "24px";
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {

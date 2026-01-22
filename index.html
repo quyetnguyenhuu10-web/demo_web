@@ -21,29 +21,57 @@
         const theme = saved === "dark" || saved === "light" ? saved : (systemDark ? "dark" : "light");
         root.setAttribute("data-theme", theme);
         
-        // 2. Apply topbar height - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
-        const TOPBAR_SIZE_KEY = "ui_topbar_h";
-        const TOPBAR_MIN = 20;
-        const TOPBAR_MAX = 56;
-        const topbarSaved = parseInt(localStorage.getItem(TOPBAR_SIZE_KEY) || "", 10);
-        if (Number.isFinite(topbarSaved) && topbarSaved >= TOPBAR_MIN && topbarSaved <= TOPBAR_MAX) {
-          const clamped = Math.max(TOPBAR_MIN, Math.min(TOPBAR_MAX, topbarSaved));
-          const pillH = Math.max(16, Math.min(34, Math.round(clamped * 0.64)));
-          // Set inline style - có priority cao nhất
-          root.style.setProperty("--topbar-h", clamped + "px");
-          root.style.setProperty("--topbar-pill-h", pillH + "px");
+        // 2. Apply topbar height từ ideal (rem) - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
+        const TOPBAR_IDEAL_KEY = "ui_topbar_ideal_rem";
+        const TOPBAR_MIN_PX = 20;
+        const TOPBAR_MAX_PX = 56;
+        const TOPBAR_DEFAULT_REM = 2.0;
+        
+        // Helper để đọc số từ localStorage
+        function readNumberLS(key, fallback) {
+          const raw = localStorage.getItem(key);
+          const n = raw == null ? NaN : parseFloat(raw);
+          return Number.isFinite(n) ? n : fallback;
         }
         
-        // 3. Apply chat width - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
-        const CHAT_W_KEY = "ui_chat_w";
-        const CHAT_MIN = 280;
-        const CHAT_MAX = 560;
-        const chatSaved = parseInt(localStorage.getItem(CHAT_W_KEY) || "", 10);
-        if (Number.isFinite(chatSaved) && chatSaved >= CHAT_MIN && chatSaved <= CHAT_MAX) {
-          const clamped = Math.max(CHAT_MIN, Math.min(CHAT_MAX, chatSaved));
-          // Set inline style - có priority cao nhất
-          root.style.setProperty("--chat-w", clamped + "px");
+        // Lấy ideal rem từ localStorage, fallback về default
+        const topbarIdealRem = readNumberLS(TOPBAR_IDEAL_KEY, TOPBAR_DEFAULT_REM);
+        
+        // Tính remPx từ font-size (mặc định 16px nếu chưa có)
+        // Dùng cách an toàn: thử getComputedStyle, nếu không có thì dùng 16
+        let remPx = 16;
+        try {
+          const fs = getComputedStyle(root).fontSize;
+          const parsed = parseFloat(fs);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            remPx = parsed;
+          }
+        } catch(e) {
+          // Fallback về 16 nếu chưa có computed style
         }
+        
+        const idealPx = topbarIdealRem * remPx;
+        const clamped = Math.max(TOPBAR_MIN_PX, Math.min(TOPBAR_MAX_PX, idealPx));
+        const pillH = Math.max(16, Math.min(34, Math.round(clamped * 0.64)));
+        // Set inline style - có priority cao nhất
+        root.style.setProperty("--topbar-h", clamped + "px");
+        root.style.setProperty("--topbar-pill-h", pillH + "px");
+        
+        // 3. Apply chat width từ ideal (vw) - QUAN TRỌNG: phải set TRƯỚC khi CSS parse
+        const CHAT_IDEAL_KEY = "ui_chat_ideal_vw";
+        const CHAT_MIN_PX = 280;
+        const CHAT_MAX_PX = 560;
+        const CHAT_DEFAULT_VW = 28;
+        
+        // Lấy ideal vw từ localStorage, fallback về default
+        const chatIdealVw = readNumberLS(CHAT_IDEAL_KEY, CHAT_DEFAULT_VW);
+        
+        // Tính vwPx từ viewport width (an toàn với window.innerWidth)
+        const vwPx = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth / 100 : 3.8;
+        const chatIdealPx = chatIdealVw * vwPx;
+        const chatClamped = Math.max(CHAT_MIN_PX, Math.min(CHAT_MAX_PX, chatIdealPx));
+        // Set inline style - có priority cao nhất
+        root.style.setProperty("--chat-w", chatClamped + "px");
       } catch(e) {
         // Fallback nếu localStorage bị block
         console.warn("Error applying saved UI settings:", e);
@@ -513,10 +541,13 @@
       border-radius: 28px;
       box-shadow: var(--shadow-soft);
 
-      padding: 8px 10px 8px 18px; /* Padding dọc để căn giữa */
-      min-height: 40px; /* Min-height phù hợp */
-      max-height: 170px; /* Giảm max-height để không quá cao */
+      padding: 8px 10px 8px 18px;
+      min-height: 40px;
+      max-height: 170px;
       overflow:hidden;
+      /* FIX: Lock height để tránh nhảy */
+      height: auto;
+      contain: layout style; /* Optimize rendering */
     }
 
     /* Model selector wrapper */
@@ -661,21 +692,19 @@
 
       font-size:16px;
       font-family:inherit;
-      line-height:1.5; /* Line-height chuẩn */
-      text-align:left; /* Căn trái placeholder và text */
+      line-height:1.5;
+      text-align:left;
 
       resize:none;
-      padding: 0; /* Không padding dọc - để chatComposer padding làm việc */
+      padding: 0;
       margin:0;
-      max-height: 150px; /* Giảm max-height để không làm chatComposer giãn ra */
+      max-height: 150px;
 
       overflow-x:hidden;
       overflow-y:auto;
-      /* Ẩn scrollbar khi không cần scroll */
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE/Edge */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
       
-      /* Căn giữa theo chiều dọc */
       vertical-align:middle;
 
       white-space:pre-wrap;
@@ -684,6 +713,11 @@
 
       color: var(--text);
       caret-color: rgba(28,26,23,0.65);
+      
+      /* FIX: Lock để tránh nhảy */
+      box-sizing: border-box;
+      transition: none; /* Tắt transition */
+      contain: layout style; /* Optimize rendering */
     }
 
     .chatComposerInput::placeholder{

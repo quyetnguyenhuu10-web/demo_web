@@ -2,6 +2,10 @@
 // Đọc config từ biến môi trường (.env)
 
 require("dotenv").config();
+
+// Khai báo DEBUG ngay từ đầu để tránh temporal dead zone
+const DEBUG = process.env.DEBUG === "true" || false;
+
 const https = require("https");
 const crypto = require("crypto");
 const express = require("express");
@@ -49,13 +53,12 @@ const OPENAI_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 // MODEL chỉ dùng làm fallback nếu UI không gửi model
 const MODEL = DEFAULT_MODEL; // Chỉ dùng default từ models.json
 const SYSTEM_PROMPT = String(process.env.SYSTEM_PROMPT || "You are a helpful assistant.");
+const MAX_INPUT_CHARS = Number(process.env.MAX_INPUT_CHARS || 8000);
 
 // Log SYSTEM_PROMPT để debug
 if (DEBUG || process.env.LOG_PROMPT === "true") {
   console.log(`[Config] SYSTEM_PROMPT: ${SYSTEM_PROMPT.substring(0, 100)}${SYSTEM_PROMPT.length > 100 ? "..." : ""}`);
 }
-const MAX_INPUT_CHARS = Number(process.env.MAX_INPUT_CHARS || 8000);
-const DEBUG = process.env.DEBUG === "true";
 
 // Log models info
 console.log(`✅ Available models: ${AVAILABLE_MODELS.map(m => m.value).join(", ")}`);

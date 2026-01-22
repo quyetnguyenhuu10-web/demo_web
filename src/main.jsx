@@ -139,101 +139,157 @@ function initClock() {
   });
 }
 
-// ===== Topbar drag resize (Cursor-like) =====
-const TOPBAR_SIZE_KEY = "ui_topbar_h"; // persist px
-const TOPBAR_MIN = 20;
-const TOPBAR_MAX = 56; // bạn có thể nâng/hạ
+// ===== Constraint-based lite sizing =====
+const SIZE_KEYS = {
+  topbar: "ui_topbar_ideal_rem",
+  chat: "ui_chat_ideal_vw",
+};
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-function getTopbarHPx() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue("--topbar-h").trim();
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? n : 28;
+function getRemPx() {
+  const fs = getComputedStyle(document.documentElement).fontSize;
+  const n = parseFloat(fs || "16");
+  return Number.isFinite(n) ? n : 16;
 }
 
-function pillHeightForTopbar(h) {
-  // giữ tỷ lệ đẹp khi topbar thay đổi
-  return Math.max(16, Math.min(34, Math.round(h * 0.64)));
+function getVwPx() {
+  return window.innerWidth / 100;
 }
 
-function applyTopbarSizePx(h) {
-  const clamped = clamp(h, TOPBAR_MIN, TOPBAR_MAX);
+function readNumberLS(key, fallback) {
+  const raw = localStorage.getItem(key);
+  const n = raw == null ? NaN : parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function writeNumberLS(key, val) {
+  localStorage.setItem(key, String(val));
+}
+
+function applyTopbarFromIdeal(idealRem) {
+  const TOPBAR_MIN_PX = 20;
+  const TOPBAR_MAX_PX = 56;
+
+  const remPx = getRemPx();
+  const idealPx = idealRem * remPx;
+  const actualPx = clamp(idealPx, TOPBAR_MIN_PX, TOPBAR_MAX_PX);
+
   const root = document.documentElement;
-  root.style.setProperty("--topbar-h", `${clamped}px`);
-  root.style.setProperty("--topbar-pill-h", `${pillHeightForTopbar(clamped)}px`);
-  localStorage.setItem(TOPBAR_SIZE_KEY, String(clamped));
+  root.style.setProperty("--topbar-h", `${actualPx}px`);
+  // pill scale theo actual, không theo px cứng
+  const pill = Math.max(16, Math.min(34, Math.round(actualPx * 0.64)));
+  root.style.setProperty("--topbar-pill-h", `${pill}px`);
 }
 
-function restoreTopbarSize() {
-  const saved = parseInt(localStorage.getItem(TOPBAR_SIZE_KEY) || "", 10);
-  if (Number.isFinite(saved)) applyTopbarSizePx(saved);
+function applyChatFromIdeal(idealVw) {
+  const CHAT_MIN_PX = 280;
+  const CHAT_MAX_PX = 560;
+
+  const vwPx = getVwPx();
+  const idealPx = idealVw * vwPx;
+  const actualPx = clamp(idealPx, CHAT_MIN_PX, CHAT_MAX_PX);
+
+  document.documentElement.style.setProperty("--chat-w", `${actualPx}px`);
 }
+
+function restoreIdealsAndApply() {
+  // Default ideal: topbar ~ 2.0rem, chat ~ 28vw
+  const idealTopbarRem = readNumberLS(SIZE_KEYS.topbar, 2.0);
+  const idealChatVw = readNumberLS(SIZE_KEYS.chat, 28);
+
+  applyTopbarFromIdeal(idealTopbarRem);
+  applyChatFromIdeal(idealChatVw);
+}
+
+// ===== Topbar drag resize (Cursor-like) =====
+const TOPBAR_MIN = 20;
+const TOPBAR_MAX = 56;
 
 function initTopbarResizer() {
   const grip = document.getElementById("topbarResizer");
   const topbar = document.querySelector(".topbar");
-  if (!grip || !topbar) return;
-
-  restoreTopbarSize();
+  if (!grip || !topbar) {
+    console.warn("⚠️ Topbar resizer element not found (main.jsx)");
+    return;
+  }
+  console.log("✅ Initializing topbar resizer (main.jsx)");
 
   let dragging = false;
   let startY = 0;
-  let startH = 0;
+  let startPx = 0;
+  let startIdealRem = 2.0;
+  let activePointerId = null;
   let raf = 0;
-  let pendingH = null;
+  let pendingIdealRem = null;
 
   function commit() {
     raf = 0;
-    if (pendingH == null) return;
-    applyTopbarSizePx(pendingH);
-    pendingH = null;
+    if (pendingIdealRem == null) return;
+    writeNumberLS(SIZE_KEYS.topbar, pendingIdealRem);
+    applyTopbarFromIdeal(pendingIdealRem);
+    pendingIdealRem = null;
   }
 
-  function onMove(clientY) {
-    const dy = clientY - startY;      // kéo xuống -> tăng height
-    const next = startH + dy;
-    pendingH = next;
+  const handlePointerMove = (e) => {
+    if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
+    
+    const dy = e.clientY - startY;      // kéo xuống -> tăng height
+    const nextPx = startPx + dy;
+    
+    const remPx = getRemPx();
+    const nextIdealRem = nextPx / remPx;
+    
+    pendingIdealRem = nextIdealRem;
     if (!raf) raf = requestAnimationFrame(commit);
-  }
+    
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handlePointerUp = (e) => {
+    if (activePointerId != null && e.pointerId !== activePointerId) return;
+    endDrag();
+    e.preventDefault();
+  };
 
   function endDrag() {
     if (!dragging) return;
     dragging = false;
     document.documentElement.removeAttribute("data-resizing");
+    
+    // Remove listeners từ document
+    document.removeEventListener("pointermove", handlePointerMove);
+    document.removeEventListener("pointerup", handlePointerUp);
+    
     try { grip.releasePointerCapture?.(activePointerId); } catch {}
     activePointerId = null;
   }
 
-  let activePointerId = null;
-
   grip.addEventListener("pointerdown", (e) => {
     // chỉ primary
     if (e.isPrimary === false) return;
+    console.log("🖱️ Topbar resizer pointerdown (main.jsx)");
     dragging = true;
     activePointerId = e.pointerId;
 
+    const remPx = getRemPx();
+    // lấy actual hiện tại từ CSS var --topbar-h (px)
+    const curPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 28;
+    startPx = curPx;
+    startIdealRem = readNumberLS(SIZE_KEYS.topbar, curPx / remPx);
+
     startY = e.clientY;
-    startH = getTopbarHPx();
 
     document.documentElement.setAttribute("data-resizing", "topbar");
+
+    // Attach listeners to document để bắt mọi movement
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
 
     // bắt pointer để kéo mượt kể cả ra ngoài topbar
     try { grip.setPointerCapture(e.pointerId); } catch {}
 
-    e.preventDefault();
-  });
-
-  grip.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    if (activePointerId != null && e.pointerId !== activePointerId) return;
-    onMove(e.clientY);
-    e.preventDefault();
-  });
-
-  grip.addEventListener("pointerup", (e) => {
-    if (activePointerId != null && e.pointerId !== activePointerId) return;
-    endDrag();
     e.preventDefault();
   });
 
@@ -244,89 +300,93 @@ function initTopbarResizer() {
 }
 
 // ===== Chat drag resize (width) =====
-const CHAT_W_KEY = "ui_chat_w";
 const CHAT_MIN = 280;
 const CHAT_MAX = 560;
-
-function getChatWPx() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue("--chat-w").trim();
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? n : 380;
-}
-
-function applyChatWidthPx(w) {
-  const clamped = clamp(w, CHAT_MIN, CHAT_MAX);
-  document.documentElement.style.setProperty("--chat-w", `${clamped}px`);
-  localStorage.setItem(CHAT_W_KEY, String(clamped));
-}
-
-function restoreChatWidth() {
-  const saved = parseInt(localStorage.getItem(CHAT_W_KEY) || "", 10);
-  if (Number.isFinite(saved)) applyChatWidthPx(saved);
-}
 
 function initChatResizer() {
   const grip = document.getElementById("chatResizer");
   const chat = document.querySelector(".chat");
-  if (!grip || !chat) return;
-
-  restoreChatWidth();
+  if (!grip || !chat) {
+    console.warn("⚠️ Chat resizer element not found (main.jsx)");
+    return;
+  }
+  console.log("✅ Initializing chat resizer (main.jsx)");
 
   let dragging = false;
   let startX = 0;
-  let startW = 0;
+  let startPx = 380;
+  let startIdealVw = 28;
 
   let activePointerId = null;
   let raf = 0;
-  let pendingW = null;
+  let pendingIdealVw = null;
 
   function commit() {
     raf = 0;
-    if (pendingW == null) return;
-    applyChatWidthPx(pendingW);
-    pendingW = null;
+    if (pendingIdealVw == null) return;
+    writeNumberLS(SIZE_KEYS.chat, pendingIdealVw);
+    applyChatFromIdeal(pendingIdealVw);
+    pendingIdealVw = null;
   }
 
-  function onMove(clientX) {
+  const handlePointerMove = (e) => {
+    if (!dragging || (activePointerId != null && e.pointerId !== activePointerId)) return;
+    
     // Chat nằm bên phải; kéo handle sang trái -> chat rộng hơn
-    const dx = startX - clientX;
-    const next = startW + dx;
-    pendingW = next;
+    const dx = startX - e.clientX;
+    const nextPx = startPx + dx;
+    
+    const vwPx = getVwPx();
+    const nextIdealVw = nextPx / vwPx;
+    
+    pendingIdealVw = nextIdealVw;
     if (!raf) raf = requestAnimationFrame(commit);
-  }
+    
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handlePointerUp = (e) => {
+    if (activePointerId != null && e.pointerId !== activePointerId) return;
+    endDrag();
+    e.preventDefault();
+  };
 
   function endDrag() {
     if (!dragging) return;
     dragging = false;
     document.documentElement.removeAttribute("data-resizing");
+    
+    // Remove listeners từ document
+    document.removeEventListener("pointermove", handlePointerMove);
+    document.removeEventListener("pointerup", handlePointerUp);
+    
     try { grip.releasePointerCapture?.(activePointerId); } catch {}
     activePointerId = null;
   }
 
   grip.addEventListener("pointerdown", (e) => {
     if (e.isPrimary === false) return;
+    console.log("🖱️ Chat resizer pointerdown (main.jsx)");
     dragging = true;
     activePointerId = e.pointerId;
 
+    const curPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--chat-w")) || 380;
+    startPx = curPx;
+
+    const vwPx = getVwPx();
+    startIdealVw = readNumberLS(SIZE_KEYS.chat, curPx / vwPx);
+
     startX = e.clientX;
-    startW = getChatWPx();
 
     document.documentElement.setAttribute("data-resizing", "chat");
+    
+    // Attach listeners to document để bắt mọi movement
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+    
     try { grip.setPointerCapture(e.pointerId); } catch {}
 
-    e.preventDefault();
-  });
-
-  grip.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    if (activePointerId != null && e.pointerId !== activePointerId) return;
-    onMove(e.clientX);
-    e.preventDefault();
-  });
-
-  grip.addEventListener("pointerup", (e) => {
-    if (activePointerId != null && e.pointerId !== activePointerId) return;
-    endDrag();
     e.preventDefault();
   });
 
@@ -1102,8 +1162,25 @@ async function sendMessage() {
 function init() {
   initTheme(); // 👈 đang có
   initClock(); // 👈 thêm dòng này
+  
+  // Khởi tạo ideals và apply constraints
+  restoreIdealsAndApply();
+  
   initTopbarResizer(); // 👈 thêm dòng này
   initChatResizer();
+  
+  // Re-apply constraints khi resize cửa sổ
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const idealTopbarRem = readNumberLS(SIZE_KEYS.topbar, 2.0);
+      const idealChatVw = readNumberLS(SIZE_KEYS.chat, 28);
+      applyTopbarFromIdeal(idealTopbarRem);
+      applyChatFromIdeal(idealChatVw);
+    }, 100);
+  });
+  
   autoGrow();
   refreshSendState();
   setStatus("ready");

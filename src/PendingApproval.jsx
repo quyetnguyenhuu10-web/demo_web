@@ -77,23 +77,20 @@ export default function PendingApproval() {
             alignItems: "center",
             justifyContent: "center",
             background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: "6px",
+            border: "none",
             cursor: "pointer",
             color: "var(--text)",
-            fontSize: "20px",
-            fontWeight: "600",
+            fontSize: "24px",
+            fontWeight: "400",
             lineHeight: "1",
-            transition: "background 0.2s ease, border-color 0.2s ease",
+            transition: "opacity 0.2s ease",
             padding: 0
           }}
           onMouseEnter={(e) => {
-            e.target.style.background = "var(--bg-soft)";
-            e.target.style.borderColor = "var(--border-soft)";
+            e.target.style.opacity = "0.6";
           }}
           onMouseLeave={(e) => {
-            e.target.style.background = "transparent";
-            e.target.style.borderColor = "var(--border)";
+            e.target.style.opacity = "1";
           }}
         >
           ×

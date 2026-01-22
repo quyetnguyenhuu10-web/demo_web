@@ -2,7 +2,8 @@
 import { SignedIn, SignedOut, SignIn, SignUp, SignOutButton, useUser } from "@clerk/clerk-react";
 import { useState } from "react";
 
-export default function SidebarMenu() {
+// Component khi có Clerk (dùng hooks)
+function ClerkSidebarMenu() {
   const { user, isLoaded } = useUser();
   const [authMode, setAuthMode] = useState("signin"); // "signin" hoặc "signup"
 
@@ -237,4 +238,34 @@ export default function SidebarMenu() {
       </SignedOut>
     </div>
   );
+}
+
+// Component khi không có Clerk (không dùng hooks)
+function NoAuthSidebarMenu() {
+  return (
+    <div className="sidebarMenu">
+      <div className="sidebarAuthSection">
+        <div className="sidebarAuthHeader">
+          <h2 className="sidebarAuthTitle">Authentication</h2>
+          <p className="sidebarAuthSubtitle">Clerk authentication is not configured.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main component - kiểm tra và render component phù hợp
+export default function SidebarMenu() {
+  // Kiểm tra xem có Clerk key không
+  const hasClerkKey = typeof import.meta !== 'undefined' && 
+    Boolean(import.meta.env?.VITE_CLERK_PUBLISHABLE_KEY?.trim());
+  
+  // Nếu không có Clerk key, render component không dùng hooks
+  if (!hasClerkKey) {
+    return <NoAuthSidebarMenu />;
+  }
+  
+  // Nếu có Clerk key, ClerkWrapper đã wrap app với ClerkProvider
+  // Nên có thể dùng Clerk hooks an toàn
+  return <ClerkSidebarMenu />;
 }

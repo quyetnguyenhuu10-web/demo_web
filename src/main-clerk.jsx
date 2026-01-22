@@ -36,24 +36,14 @@ function init() {
     document.body.appendChild(rootEl);
   }
 
-  if (!clerkKey) {
-    console.warn("⚠️ Clerk Publishable Key chưa được cấu hình. Chạy app không có authentication.");
-    // Render App trực tiếp (không có Clerk)
-    const root = createRoot(rootEl);
-    root.render(
-      <StrictMode>
-        <App />
-      </StrictMode>
-    );
-  } else {
-    // Render với Clerk
-    const root = createRoot(rootEl);
-    root.render(
-      <StrictMode>
-        <AppWrapper clerkKey={clerkKey} />
-      </StrictMode>
-    );
-  }
+  // Luôn render với ClerkWrapper để SidebarMenu có thể dùng Clerk hooks
+  // ClerkWrapper sẽ xử lý trường hợp không có key bằng dummy key
+  const root = createRoot(rootEl);
+  root.render(
+    <StrictMode>
+      <AppWrapper clerkKey={clerkKey} />
+    </StrictMode>
+  );
 }
 
 // Chạy init

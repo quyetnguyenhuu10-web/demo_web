@@ -46,8 +46,8 @@ const VALID_MODELS = AVAILABLE_MODELS.map(m => m.value);
 const PORT = Number(process.env.PORT || 3001);
 const OPENAI_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 // KHÔNG có model mặc định - phải lấy từ UI selection
-// SYSTEM_PROMPT BẮT BUỘC phải có trong .env - không có fallback
-const SYSTEM_PROMPT = String(process.env.SYSTEM_PROMPT || "").trim();
+// SYSTEM_PROMPT - có fallback nếu không set trong .env
+const SYSTEM_PROMPT = String(process.env.SYSTEM_PROMPT || "You are a helpful assistant.").trim();
 const MAX_INPUT_CHARS = Number(process.env.MAX_INPUT_CHARS || 8000);
 
 // Log SYSTEM_PROMPT để debug
@@ -69,10 +69,10 @@ if (!OPENAI_KEY) {
   process.exit(1);
 }
 
-if (!SYSTEM_PROMPT) {
-  console.error("❌ Missing SYSTEM_PROMPT in .env file");
-  console.error("   Tạo file .env và thêm: SYSTEM_PROMPT=Your prompt here...");
-  process.exit(1);
+if (!SYSTEM_PROMPT || SYSTEM_PROMPT === "You are a helpful assistant.") {
+  console.warn("⚠️  SYSTEM_PROMPT not set in .env file, using default fallback");
+  console.warn("   Để tùy chỉnh, tạo file .env và thêm: SYSTEM_PROMPT=Your prompt here...");
+  console.warn("   Hoặc set biến môi trường SYSTEM_PROMPT khi chạy server");
 }
 
 // ---------------- Token cadence (server-side) ----------------

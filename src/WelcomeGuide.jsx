@@ -9,9 +9,9 @@ export default function WelcomeGuide() {
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Kiểm tra xem user đã xem hướng dẫn chưa (lưu trong publicMetadata)
+  // Kiểm tra xem user đã xem hướng dẫn chưa trong session này (dùng sessionStorage)
   useEffect(() => {
-    const checkWelcomeStatus = async () => {
+    const checkWelcomeStatus = () => {
       if (!user?.id) {
         setIsLoading(false);
         return;
@@ -25,67 +25,41 @@ export default function WelcomeGuide() {
         // Admin và trusted user không cần xem hướng dẫn
         if (isAdmin || isTrusted) {
           setIsLoading(false);
+          setIsVisible(false);
           return;
         }
 
-        const publicMetadata = user.publicMetadata || {};
-        const hasSeenGuide = publicMetadata.hasSeenWelcomeGuide === true;
+        // Kiểm tra sessionStorage - chỉ hiển thị 1 lần mỗi session
+        const sessionKey = `welcome_guide_seen_session_${user.id}`;
+        const hasSeenInSession = sessionStorage.getItem(sessionKey) === "true";
         
-        if (!hasSeenGuide) {
+        // Hiển thị hướng dẫn nếu chưa xem trong session này
+        if (!hasSeenInSession) {
           setIsVisible(true);
+        } else {
+          setIsVisible(false);
         }
       } catch (e) {
         console.error("Failed to check welcome guide status:", e);
+        setIsVisible(false);
       } finally {
         setIsLoading(false);
       }
     };
 
     checkWelcomeStatus();
-  }, [user?.id, user?.publicMetadata]);
+  }, [user?.id]);
 
-  const handleClose = async () => {
-    if (!user?.id || !getToken) {
+  const handleClose = () => {
+    if (!user?.id) {
       setIsVisible(false);
       return;
     }
 
-    try {
-      const token = await getToken();
-      if (!token) {
-        setIsVisible(false);
-        return;
-      }
-
-      // Update user metadata để đánh dấu đã xem hướng dẫn
-      const response = await fetch(buildApiUrl("/api/user/mark-welcome-seen"), {
-        method: "POST",
-        headers: {
-          ...buildApiHeaders(),
-          "Authorization": `Bearer ${token}`,
-        },
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        // Reload user để cập nhật metadata
-        if (user.reload) {
-          await user.reload();
-        }
-        setIsVisible(false);
-      } else {
-        // Nếu API không thành công, vẫn đóng modal và lưu vào localStorage làm fallback
-        const key = `welcome_guide_seen_${user.id}`;
-        localStorage.setItem(key, "true");
-        setIsVisible(false);
-      }
-    } catch (e) {
-      console.error("Failed to mark welcome guide as seen:", e);
-      // Fallback: lưu vào localStorage
-      const key = `welcome_guide_seen_${user.id}`;
-      localStorage.setItem(key, "true");
-      setIsVisible(false);
-    }
+    // Lưu vào sessionStorage để không hiển thị lại trong session này
+    const sessionKey = `welcome_guide_seen_session_${user.id}`;
+    sessionStorage.setItem(sessionKey, "true");
+    setIsVisible(false);
   };
 
   if (isLoading || !isVisible) {

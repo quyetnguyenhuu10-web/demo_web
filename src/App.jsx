@@ -629,12 +629,21 @@ export default function App() {
     loadModels();
   }, []);
 
-  // Kiểm tra readonly state và pending state
+  // Kiểm tra readonly state
   const authState = checkAuthorization(user) || { isReadOnly: false, state: 'unauthenticated', isTrusted: false, isAdmin: false };
   const { isReadOnly, state: authStateType, isTrusted, isAdmin } = authState;
-  const isPending = authStateType === 'pending';
   // Admin và trusted user có thể dùng mọi tính năng (chat với AI thật)
   const canUseFullFeatures = isAdmin || isTrusted;
+  
+  // Debug logging
+  console.log("[App] User auth state:", {
+    userId: user?.id,
+    isAdmin,
+    isTrusted,
+    isReadOnly,
+    authStateType,
+    canUseFullFeatures,
+  });
 
   // Toast state
   const [toast, setToast] = useState(null);
@@ -971,30 +980,32 @@ export default function App() {
     if (!text) return;
     if (status === "creating" || status === "streaming") return;
 
-    // Kiểm tra readonly trước
-    if (isReadOnly) {
-      setToast({
-        message: "📖 Bạn đang ở chế độ xem. Không thể gửi tin nhắn.",
-        duration: 3000,
-      });
-      return;
-    }
+    console.log("[App] sendMessage called:", {
+      text: text.substring(0, 50),
+      canUseFullFeatures,
+      isReadOnly,
+      isAdmin,
+      isTrusted,
+      authStateType,
+    });
 
-    // Gatekeeping: Kiểm tra authorization trước khi gửi message
-    try {
-      requireAuthorization(user);
-    } catch (err) {
-      setStatusDom("error");
-      // Hiển thị thông báo thân thiện hơn cho pending approval
-      const errorMsg = err.message.includes('PENDING_APPROVAL') 
-        ? "⏳ Tài khoản của bạn đang chờ phê duyệt. Vui lòng liên hệ quản trị viên."
-        : err.message;
-      setToast({
-        message: errorMsg,
-        duration: 4000,
-      });
-      return;
+    // Gatekeeping: Chỉ kiểm tra authorization cho admin/trusted users (để chat với AI thật)
+    // Viewer và authorized thường sẽ được phép gửi tin nhắn để nhận thông báo mặc định
+    if (canUseFullFeatures) {
+      // Chỉ check authorization cho admin/trusted users khi họ muốn chat với AI thật
+      try {
+        requireAuthorization(user);
+      } catch (err) {
+        setStatusDom("error");
+        setToast({
+          message: err.message,
+          duration: 4000,
+        });
+        return;
+      }
     }
+    // Viewer và authorized thường không cần check authorization - họ sẽ nhận thông báo mặc định
+    // Viewer (readonly) vẫn có thể gửi tin nhắn để nhận thông báo mặc định
 
     // reset lock cho lượt mới
     userScrollLockedRef.current = false;
@@ -1064,6 +1075,7 @@ export default function App() {
       }
     } else {
       // User thường: CHẾ ĐỘ GIỚI THIỆU - Không gọi API thật, chỉ trả về thông báo mặc định
+      console.log("[App] Using introductory mode - showing default message");
       // Simulate delay để giống như đang xử lý
       setTimeout(() => {
         setStatusDom("streaming");
@@ -1694,7 +1706,7 @@ Nếu bạn có câu hỏi về cách sử dụng hệ thống, hãy cho tôi bi
                       localStorage.setItem(MODEL_STORAGE_KEY, model);
                     }
                   }}
-                  disabled={status === "creating" || status === "streaming" || isReadOnly || isPending || availableModels.length === 0}
+                  disabled={status === "creating" || status === "streaming" || availableModels.length === 0}
                 />
                 {/* Snapshot button - đặt cạnh model selector, sát mép phải, cách mép 10px */}
                 <div style={{ marginLeft: "auto", marginRight: "10px" }}>
@@ -1706,11 +1718,11 @@ Nếu bạn có câu hỏi về cách sử dụng hệ thống, hãy cho tôi bi
                 <textarea
                   id="ta"
                   className="chatComposerInput"
-                  placeholder={isPending ? "Đang chờ phê duyệt..." : "Nhập câu hỏi..."}
+                  placeholder="Nhập câu hỏi..."
                   spellCheck="false"
                   value={input}
                   rows={1}
-                  disabled={isPending || isReadOnly}
+                  disabled={false}
                   style={{ 
                     minHeight: "24px",
                     maxHeight: "150px",
@@ -1790,7 +1802,7 @@ Nếu bạn có câu hỏi về cách sử dụng hệ thống, hãy cho tôi bi
                   className="chatSend"
                   type="button"
                   aria-label="Send"
-                  disabled={status === "creating" || status === "streaming" || input.trim().length === 0 || isPending || isReadOnly}
+                  disabled={status === "creating" || status === "streaming" || input.trim().length === 0}
                   onClick={sendMessage}
                 >
                   <svg className="sendIcon" viewBox="0 0 24 24" fill="none">

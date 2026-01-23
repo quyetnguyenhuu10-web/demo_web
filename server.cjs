@@ -529,11 +529,25 @@ async function requireAuthorization(req, res, next) {
     const publicMetadata = user.publicMetadata || {};
     const authorized = publicMetadata.authorized === true;
 
+    // Nếu chưa có authorized, tự động set thành viewer (readonly + authorized)
     if (!authorized) {
-      return res.status(403).json({
-        error: "PENDING_APPROVAL",
-        message: "Your account is pending admin approval. Please contact administrator.",
-      });
+      try {
+        await clerkClient.users.updateUser(req.auth.userId, {
+          publicMetadata: {
+            ...publicMetadata,
+            authorized: true,
+            readonly: true,
+          },
+        });
+        console.log(`[${isoNow()}] ✅ Auto-set viewer for user: ${req.auth.userId}`);
+        // Tiếp tục xử lý request sau khi đã set viewer
+      } catch (e) {
+        console.error(`[${isoNow()}] Failed to auto-set viewer:`, e.message);
+        return res.status(500).json({
+          error: "INIT_FAILED",
+          message: "Failed to initialize user account",
+        });
+      }
     }
 
     // Authorized - cho phép tiếp tục
@@ -607,21 +621,21 @@ app.post("/api/user/init",
       const user = await clerkClient.users.getUser(userId);
       const publicMetadata = user.publicMetadata || {};
 
-      // Nếu user chưa có metadata (user mới), tự động set readonly
-      if (!publicMetadata.authorized && !publicMetadata.readonly) {
+      // Nếu user chưa có authorized, tự động set thành viewer (readonly + authorized)
+      if (!publicMetadata.authorized) {
         await clerkClient.users.updateUser(userId, {
           publicMetadata: {
             ...publicMetadata,
             authorized: true,
-            readonly: true, // Tự động set readonly cho user mới
+            readonly: true, // Tự động set readonly (viewer) cho user mới
           },
         });
 
-        console.log(`[${isoNow()}] ✅ Auto-set readonly for new user: ${userId}`);
+        console.log(`[${isoNow()}] ✅ Auto-set viewer (readonly) for user: ${userId}`);
         
         return res.json({
           ok: true,
-          message: "User initialized as readonly",
+          message: "User initialized as viewer (readonly)",
           isNewUser: true,
         });
       }

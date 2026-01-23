@@ -22,21 +22,41 @@ export default function WelcomeGuide() {
         const authState = checkAuthorization(user);
         const { isAdmin, isTrusted } = authState;
         
+        console.log("[WelcomeGuide] User auth state:", {
+          userId: user?.id,
+          isAdmin,
+          isTrusted,
+          authState: authState.state,
+        });
+        
         // Admin và trusted user không cần xem hướng dẫn
         if (isAdmin || isTrusted) {
+          console.log("[WelcomeGuide] Admin/Trusted user - skipping guide");
           setIsLoading(false);
           setIsVisible(false);
           return;
         }
 
         // Kiểm tra sessionStorage - chỉ hiển thị 1 lần mỗi session
+        // DEBUG: Cho phép force show bằng URL param ?showWelcomeGuide=true
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceShow = urlParams.get("showWelcomeGuide") === "true";
+        
         const sessionKey = `welcome_guide_seen_session_${user.id}`;
         const hasSeenInSession = sessionStorage.getItem(sessionKey) === "true";
         
-        // Hiển thị hướng dẫn nếu chưa xem trong session này
-        if (!hasSeenInSession) {
+        console.log("[WelcomeGuide] Session check:", {
+          sessionKey,
+          hasSeenInSession,
+          forceShow,
+        });
+        
+        // Hiển thị hướng dẫn nếu chưa xem trong session này hoặc force show
+        if (!hasSeenInSession || forceShow) {
+          console.log("[WelcomeGuide] Showing guide", forceShow ? "(forced)" : "");
           setIsVisible(true);
         } else {
+          console.log("[WelcomeGuide] Guide already seen in this session - hiding");
           setIsVisible(false);
         }
       } catch (e) {

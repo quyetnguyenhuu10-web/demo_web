@@ -3,7 +3,6 @@ import { ClerkProvider, SignIn, SignUp, SignedIn, SignedOut, useUser, useAuth } 
 import { useEffect } from "react";
 import { checkAuthorization } from "./auth-utils.js";
 import { buildApiUrl, buildApiHeaders } from "./config.js";
-import PendingApproval from "./PendingApproval.jsx";
 import ViewerNotice from "./ViewerNotice.jsx";
 import WelcomeGuide from "./WelcomeGuide.jsx";
 import AuthModal from "./AuthModal.jsx";
@@ -74,30 +73,7 @@ function AuthorizationGate({ children }) {
     return null; // Clerk sẽ handle
   }
 
-  // State 1: Pending Approval - hiển thị modal overlay, không ẩn app
-  if (state === 'pending') {
-    return (
-      <>
-        <style>{`
-          /* Đảm bảo React elements hiển thị */
-          .app[data-react="true"] { 
-            display: flex !important; 
-          }
-          .topbar[data-react="true"] { 
-            display: grid !important; 
-          }
-          .chat[data-react="true"] {
-            display: flex !important;
-          }
-        `}</style>
-        {/* Hiển thị modal pending approval nhưng vẫn cho phép xem web */}
-        <PendingApproval />
-        {children}
-      </>
-    );
-  }
-
-  // State 2, 3, 4, 5: Authorized - Cho phép truy cập app
+  // Tất cả authenticated users đều được phép truy cập app (không còn pending)
   if (isAuthorized) {
     // Expose readonly state và getToken function to window for main.jsx (vanilla JS)
     const { isReadOnly } = checkAuthorization(user);
@@ -122,8 +98,8 @@ function AuthorizationGate({ children }) {
         if (!user?.id || !getToken) return;
         
         const publicMetadata = user.publicMetadata || {};
-        // Nếu user chưa có authorized và readonly, tự động init
-        if (!publicMetadata.authorized && !publicMetadata.readonly) {
+        // Nếu user chưa có authorized, tự động init thành viewer (readonly + authorized)
+        if (!publicMetadata.authorized) {
           try {
             const token = await getToken();
             if (!token) return;

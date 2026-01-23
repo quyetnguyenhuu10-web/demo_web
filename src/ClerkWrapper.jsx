@@ -5,6 +5,7 @@ import { checkAuthorization } from "./auth-utils.js";
 import { buildApiUrl, buildApiHeaders } from "./config.js";
 import PendingApproval from "./PendingApproval.jsx";
 import ViewerNotice from "./ViewerNotice.jsx";
+import WelcomeGuide from "./WelcomeGuide.jsx";
 import AuthModal from "./AuthModal.jsx";
 
 // Component kiểm tra authorization sau khi đã signed in
@@ -169,6 +170,8 @@ function AuthorizationGate({ children }) {
             display: flex !important;
           }
         `}</style>
+        {/* Hiển thị WelcomeGuide cho user mới đăng nhập */}
+        <WelcomeGuide />
         {/* Hiển thị ViewerNotice nếu user là readonly */}
         {isReadOnly && <ViewerNotice />}
         {children}

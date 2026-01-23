@@ -9,7 +9,7 @@ const HEADER_LINES = 3;
  * Dòng 2: (optional) Title/Session (center hoặc left) - nếu không có thì để trống
  * Dòng 3: Spacer (luôn trống)
  */
-export default function PageHeader({ day, date, title, style = {} }) {
+export default function PageHeader({ day, date, title, children, style = {} }) {
   const today = useMemo(() => {
     const now = new Date();
     return {
@@ -72,20 +72,21 @@ export default function PageHeader({ day, date, title, style = {} }) {
         <span>{displayDate}</span>
       </div>
 
-      {/* Line 2: Title/Session (optional) */}
+      {/* Line 2: Title/Session (optional) hoặc Snapshot button */}
       <div
         style={{
           height: `${LINE_HEIGHT_PX}px`,
           display: "flex",
           alignItems: "center",
+          justifyContent: title ? "flex-start" : "flex-end",
           fontSize: "12px",
           fontWeight: 700, // Đồng bộ với Day/Date
           color: "var(--header-text)", // Tăng độ đậm để dễ đọc hơn mà vẫn giữ vẻ thanh mảnh
           lineHeight: `${LINE_HEIGHT_PX}px`,
-          textAlign: title ? "left" : "center",
         }}
       >
         {title || ""}
+        {children && <div style={{ marginLeft: "auto" }}>{children}</div>}
       </div>
 
       {/* Line 3: Spacer (luôn trống) */}

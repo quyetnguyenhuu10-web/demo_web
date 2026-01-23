@@ -1,0 +1,19 @@
+=== PAPER SNAPSHOT - AI DATA SOURCE ===
+
+METADATA:
+- Thứ: Thứ sáu
+- Ngày: 23/01/2026
+- Giờ: 16:17:26
+- Số dòng: 35
+- Trang: 1
+- Timestamp: 2026-01-23T09:17:26.813Z
+
+=== PROMPT FOR AI ===
+Đây là dữ liệu được snapshot từ vùng paper (writing pane) trong hệ thống web hiện tại.
+Vùng paper là một editor với giao diện giống tờ giấy có dòng kẻ, số dòng bên trái, và hỗ trợ soạn thảo văn bản.
+Dữ liệu này được lưu để làm nguồn dữ liệu cho AI đọc và xử lý.
+
+=== CONTENT ===
+bạn khỏe không
+
+=== END OF SNAPSHOT ===

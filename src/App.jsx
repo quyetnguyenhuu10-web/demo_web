@@ -10,6 +10,7 @@ import Toast from "./Toast.jsx";
 import SidebarMenu from "./SidebarMenu.jsx";
 import WritingPane from "./WritingPane.jsx";
 import { useRail } from "./RailContext";
+import PaperSnapshotButton from "./PaperSnapshotButton.jsx";
 
 const FOLLOW_BOTTOM_THRESHOLD_PX = 140;
 
@@ -629,9 +630,11 @@ export default function App() {
   }, []);
 
   // Kiểm tra readonly state và pending state
-  const authState = checkAuthorization(user) || { isReadOnly: false, state: 'unauthenticated' };
-  const { isReadOnly, state: authStateType } = authState;
+  const authState = checkAuthorization(user) || { isReadOnly: false, state: 'unauthenticated', isTrusted: false, isAdmin: false };
+  const { isReadOnly, state: authStateType, isTrusted, isAdmin } = authState;
   const isPending = authStateType === 'pending';
+  // Admin và trusted user có thể dùng mọi tính năng (chat với AI thật)
+  const canUseFullFeatures = isAdmin || isTrusted;
 
   // Toast state
   const [toast, setToast] = useState(null);
@@ -1032,28 +1035,85 @@ export default function App() {
     // start streaming
     activeRef.current.turnId = turnId;
 
-    try {
-      const sid = await createJob(text);
-      setStatusDom("streaming");
+    // Kiểm tra: Nếu là admin hoặc trusted user thì cho phép chat với AI thật
+    // Nếu không thì chỉ hiển thị thông báo mặc định (chế độ giới thiệu)
+    if (canUseFullFeatures) {
+      // Admin và trusted user: Gọi API thật để chat với AI
+      try {
+        const sid = await createJob(text);
+        setStatusDom("streaming");
 
-      const info = await streamJob(sid);
+        const info = await streamJob(sid);
 
-      // Đảm bảo scroll cuối cùng nếu gần bottom
-      autoScrollIfNearBottom();
+        // Đảm bảo scroll cuối cùng nếu gần bottom
+        autoScrollIfNearBottom();
 
-      // nếu không có token
-      if (!info.gotToken) {
+        // nếu không có token
+        if (!info.gotToken) {
+          setTurns((prev) =>
+            prev.map((t) => (t.id === turnId ? { ...t, assistant: "[Không có dữ liệu trả về]" } : t))
+          );
+        }
+      } catch (e) {
+        const msg = e?.message || String(e);
         setTurns((prev) =>
-          prev.map((t) => (t.id === turnId ? { ...t, assistant: "[Không có dữ liệu trả về]" } : t))
+          prev.map((t) => (t.id === turnId ? { ...t, assistant: `[Lỗi] ${msg}` } : t))
         );
+        setStatusDom("error");
+        stopStream();
       }
-    } catch (e) {
-      const msg = e?.message || String(e);
-      setTurns((prev) =>
-        prev.map((t) => (t.id === turnId ? { ...t, assistant: `[Lỗi] ${msg}` } : t))
-      );
-      setStatusDom("error");
-      stopStream();
+    } else {
+      // User thường: CHẾ ĐỘ GIỚI THIỆU - Không gọi API thật, chỉ trả về thông báo mặc định
+      // Simulate delay để giống như đang xử lý
+      setTimeout(() => {
+        setStatusDom("streaming");
+        
+        // Thông báo mặc định về tính năng hệ thống
+        const defaultResponse = `Chào bạn! 👋
+
+Đây là hệ thống hỗ trợ học tập với AI. Hiện tại, tính năng chat đang ở **chế độ giới thiệu**.
+
+## 📸 Tính năng Snapshot
+
+Để AI có thể hỗ trợ bạn tốt nhất, bạn cần sử dụng tính năng **Snapshot**:
+
+1. **Viết nội dung** vào vùng paper (giấy viết) ở giữa màn hình
+2. **Nhấn nút "📸 Snapshot"** ở thanh chat (bên phải, cạnh model selector)
+3. Nội dung sẽ được lưu và AI có thể đọc để hỗ trợ bạn
+
+## 💬 Tính năng Chat
+
+Hiện tại, tính năng chat đang ở chế độ giới thiệu. Bạn có thể:
+- Tìm hiểu về các tính năng của hệ thống
+- Xem hướng dẫn sử dụng
+- Khám phá các chức năng có sẵn
+
+## 🎯 Mục đích hệ thống
+
+Hệ thống này được thiết kế để:
+- Hỗ trợ bạn trong việc học tập
+- Cung cấp công cụ viết và chỉnh sửa văn bản
+- Tích hợp với AI để nhận hỗ trợ thông minh
+
+Nếu bạn có câu hỏi về cách sử dụng hệ thống, hãy cho tôi biết!`;
+
+        // Simulate streaming response
+        let currentIndex = 0;
+        const streamInterval = setInterval(() => {
+          if (currentIndex < defaultResponse.length) {
+            const chunk = defaultResponse.slice(0, currentIndex + 10);
+            setTurns((prev) =>
+              prev.map((t) => (t.id === turnId ? { ...t, assistant: chunk } : t))
+            );
+            currentIndex += 10;
+            autoScrollIfNearBottom();
+          } else {
+            clearInterval(streamInterval);
+            setStatusDom("ready");
+            stopStream();
+          }
+        }, 30); // 30ms delay giữa các chunk để giống streaming
+      }, 500); // Delay ban đầu 500ms
     }
   };
 
@@ -1636,6 +1696,10 @@ export default function App() {
                   }}
                   disabled={status === "creating" || status === "streaming" || isReadOnly || isPending || availableModels.length === 0}
                 />
+                {/* Snapshot button - đặt cạnh model selector, sát mép phải, cách mép 10px */}
+                <div style={{ marginLeft: "auto", marginRight: "10px" }}>
+                  <PaperSnapshotButton />
+                </div>
               </div>
               
               <div className="chatComposer">
@@ -1652,11 +1716,15 @@ export default function App() {
                     maxHeight: "150px",
                     resize: "none",
                     overflowY: "auto",
+                    overflowX: "hidden", // Ẩn scroll ngang, chỉ cho scroll dọc
                     height: input === "" ? "24px" : "auto", // Tự động về 24px khi empty
                     lineHeight: "1.5",
                     padding: "0",
                     boxSizing: "border-box", // Quan trọng: đảm bảo height tính đúng
-                    transition: "none" // Tắt transition để tránh nhảy
+                    transition: "none", // Tắt transition để tránh nhảy
+                    wordWrap: "break-word", // Tự động xuống dòng khi quá dài
+                    whiteSpace: "pre-wrap", // Giữ nguyên line breaks và tự động wrap
+                    wordBreak: "break-word" // Break word nếu quá dài
                   }}
                   onChange={(e) => {
                     const newValue = e.target.value;
@@ -1681,6 +1749,26 @@ export default function App() {
                     textarea.style.height = newHeight + "px";
                     // Restore scroll position
                     textarea.scrollTop = scrollTop;
+                  }}
+                  onPaste={(e) => {
+                    // Sau khi paste, đợi một chút rồi resize để đảm bảo text đã được paste xong
+                    setTimeout(() => {
+                      const textarea = e.target;
+                      const newValue = textarea.value;
+                      
+                      if (!newValue || newValue.trim() === "") {
+                        textarea.style.height = "24px";
+                        return;
+                      }
+                      
+                      // Reset height để tính lại
+                      textarea.style.height = "auto";
+                      const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 150);
+                      textarea.style.height = newHeight + "px";
+                      
+                      // Scroll xuống cuối để xem text vừa paste
+                      textarea.scrollTop = textarea.scrollHeight;
+                    }, 0);
                   }}
                   onBlur={(e) => {
                     // Khi mất focus, nếu không có chữ thì reset về kích thước ban đầu

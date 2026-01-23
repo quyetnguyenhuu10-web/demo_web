@@ -287,6 +287,7 @@ export default function WritingPane() {
                   }
                 />
                 <HistoryPlugin />
+                {/* Snapshot button đã được di chuyển sang App.jsx (cạnh model selector) */}
               </LexicalComposer>
             </PageBody>
 

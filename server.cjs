@@ -399,15 +399,20 @@ function hasClerkDependencies() {
   }
 }
 
+// Debug: Log Clerk env vars để kiểm tra
+if (DEBUG || process.env.CLERK_SECRET_KEY) {
+  console.log(`[${isoNow()}] 🔍 Clerk env check:`);
+  console.log(`   CLERK_SECRET_KEY: ${process.env.CLERK_SECRET_KEY ? "[SET]" : "[NOT SET]"}`);
+  console.log(`   CLERK_PUBLISHABLE_KEY: ${process.env.CLERK_PUBLISHABLE_KEY ? "[SET]" : "[NOT SET]"}`);
+  console.log(`   VITE_CLERK_PUBLISHABLE_KEY: ${process.env.VITE_CLERK_PUBLISHABLE_KEY ? "[SET]" : "[NOT SET]"} (frontend only)`);
+}
+
 // Chỉ load Clerk nếu có dependencies VÀ có CLERK_SECRET_KEY
+// Backend chỉ cần CLERK_SECRET_KEY để verify tokens
+// CLERK_PUBLISHABLE_KEY chỉ cần cho frontend (VITE_CLERK_PUBLISHABLE_KEY)
 if (process.env.CLERK_SECRET_KEY && hasClerkDependencies()) {
   try {
-    const { ClerkExpressRequireAuth } = require("@clerk/clerk-sdk-node");
-    clerkMiddleware = ClerkExpressRequireAuth({
-      // Optional: configure options here
-    });
-    
-    // Thử load clerkClient từ @clerk/backend (recommended)
+    // Load clerkClient trước (chỉ cần secret key)
     try {
       const { createClerkClient } = require("@clerk/backend");
       clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -425,13 +430,33 @@ if (process.env.CLERK_SECRET_KEY && hasClerkDependencies()) {
       }
     }
     
-    console.log("✅ Clerk middleware enabled");
+    // Chỉ load Clerk middleware nếu có publishable key
+    // ClerkExpressRequireAuth cần publishable key để hoạt động
+    if (process.env.CLERK_PUBLISHABLE_KEY) {
+      try {
+        const { ClerkExpressRequireAuth } = require("@clerk/clerk-sdk-node");
+        clerkMiddleware = ClerkExpressRequireAuth({
+          publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+        });
+        console.log("✅ Clerk middleware enabled");
+      } catch (e) {
+        console.warn("⚠️ Failed to load Clerk middleware:", e.message);
+        console.warn("   Will use manual token verification instead.");
+        clerkMiddleware = null;
+      }
+    } else {
+      console.log("ℹ️  Clerk middleware skipped (no CLERK_PUBLISHABLE_KEY)");
+      console.log("   Will use manual token verification via clerkClient.");
+      clerkMiddleware = null;
+    }
   } catch (e) {
-    console.warn("⚠️ Failed to load Clerk middleware:", e.message);
+    console.warn("⚠️ Failed to initialize Clerk:", e.message);
     console.warn("   Server will continue without Clerk authentication.");
+    clerkMiddleware = null;
+    clerkClient = null;
   }
 } else {
-  // Không có Clerk - server vẫn chạy bình thường
+  // Không có đủ Clerk config - server vẫn chạy bình thường
   if (process.env.CLERK_SECRET_KEY && !hasClerkDependencies()) {
     // Có CLERK_SECRET_KEY nhưng không có dependencies
     console.warn("⚠️ CLERK_SECRET_KEY is set but Clerk dependencies are not installed.");
@@ -439,15 +464,54 @@ if (process.env.CLERK_SECRET_KEY && hasClerkDependencies()) {
     console.warn("   Server will continue without Clerk authentication.");
   }
   // Không có CLERK_SECRET_KEY - không cần log gì, server chạy bình thường
+  clerkMiddleware = null; // Đảm bảo clerkMiddleware là null
 }
 
 // ---------------- ABAC Authorization Middleware ----------------
 // Kiểm tra Public Metadata: authorized === true
 async function requireAuthorization(req, res, next) {
-  // Nếu không có Clerk, skip check (dev mode)
+  // Nếu không có Clerk client, skip check (dev mode)
   if (!clerkClient) {
     if (DEBUG) console.log(`[${isoNow()}] Authorization: No Clerk client, skipping check`);
     return next();
+  }
+  
+  // Nếu không có Clerk middleware, verify token thủ công từ Authorization header
+  if (!clerkMiddleware) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({
+          error: "UNAUTHENTICATED",
+          message: "Authentication required. Please sign in.",
+        });
+      }
+      
+      const token = authHeader.substring(7); // Remove "Bearer " prefix
+      // Verify token bằng clerkClient
+      try {
+        const { verifyToken } = require("@clerk/backend/server");
+        const payload = await verifyToken(token, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+        });
+        // Set req.auth để tương thích với code sau
+        req.auth = { userId: payload.sub };
+      } catch (verifyError) {
+        // Fallback: thử dùng clerkClient để verify
+        try {
+          const session = await clerkClient.verifyToken(token);
+          req.auth = { userId: session.sub };
+        } catch (e2) {
+          throw verifyError; // Throw original error
+        }
+      }
+    } catch (e) {
+      if (DEBUG) console.log(`[${isoNow()}] Authorization: Token verification failed:`, e.message);
+      return res.status(401).json({
+        error: "UNAUTHENTICATED",
+        message: "Invalid or expired token. Please sign in again.",
+      });
+    }
   }
   
   // Nếu không có auth (không có token hoặc token invalid)
@@ -580,6 +644,55 @@ app.post("/api/user/init",
   }
 );
 
+// ---------------- API: Mark welcome guide as seen ---------------- 
+console.log(`[${isoNow()}] 📝 Registering route: POST /api/user/mark-welcome-seen`);
+app.post("/api/user/mark-welcome-seen",
+  clerkMiddleware || ((req, res, next) => next()),
+  async (req, res) => {
+    // Chỉ cần authenticated, không cần requireAuthorization
+    if (!req.auth?.userId) {
+      return res.status(401).json({
+        error: "UNAUTHENTICATED",
+        message: "Authentication required",
+      });
+    }
+
+    if (!clerkClient) {
+      return res.status(500).json({
+        error: "CLERK_NOT_CONFIGURED",
+        message: "Clerk client not available",
+      });
+    }
+
+    try {
+      const userId = req.auth.userId;
+      const user = await clerkClient.users.getUser(userId);
+      const publicMetadata = user.publicMetadata || {};
+
+      // Update metadata để đánh dấu đã xem welcome guide
+      await clerkClient.users.updateUser(userId, {
+        publicMetadata: {
+          ...publicMetadata,
+          hasSeenWelcomeGuide: true,
+        },
+      });
+
+      console.log(`[${isoNow()}] ✅ Marked welcome guide as seen for user: ${userId}`);
+      
+      return res.json({
+        ok: true,
+        message: "Welcome guide marked as seen",
+      });
+    } catch (e) {
+      console.error(`[${isoNow()}] Failed to mark welcome guide as seen:`, e.message);
+      return res.status(500).json({
+        error: "UPDATE_FAILED",
+        message: `Failed to update user metadata: ${e.message}`,
+      });
+    }
+  }
+);
+
 // ---------------- API: create job ---------------- 
 app.post("/api/chat/create", 
   clerkMiddleware || ((req, res, next) => next()),
@@ -647,6 +760,164 @@ app.post("/api/chat/create",
   });
 
   res.json({ ok: true, sid });
+});
+
+// ---------------- API: Paper Snapshot ---------------- 
+// Snapshot dữ liệu từ vùng paper và lưu vào file txt
+console.log(`[${isoNow()}] 📝 Registering route: POST /api/paper/snapshot`);
+app.post("/api/paper/snapshot",
+  // CORS preflight
+  (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  },
+  // Clerk middleware - chỉ dùng nếu có Clerk middleware
+  // Lưu ý: Backend chỉ cần CLERK_SECRET_KEY để load clerkClient
+  // CLERK_PUBLISHABLE_KEY chỉ cần cho frontend (VITE_CLERK_PUBLISHABLE_KEY)
+  (req, res, next) => {
+    // Nếu không có Clerk middleware, skip
+    if (!clerkMiddleware) {
+      return next();
+    }
+    // Wrap Clerk middleware để catch errors
+    return clerkMiddleware(req, res, (err) => {
+      if (err) {
+        console.warn(`[${isoNow()}] Clerk middleware error (skipping):`, err.message);
+        // Skip Clerk middleware nếu có lỗi, để requireAuthorization xử lý
+        // requireAuthorization sẽ check req.auth và trả về JSON error nếu cần
+        return next();
+      }
+      next();
+    });
+  },
+  requireAuthorization,
+  (req, res) => {
+    // Đảm bảo response luôn là JSON
+    res.setHeader("Content-Type", "application/json");
+    
+    try {
+      // Debug: Log request body để kiểm tra
+      if (DEBUG) {
+        console.log(`[${isoNow()}] Paper snapshot request:`, {
+          hasBody: !!req.body,
+          contentType: req.headers["content-type"],
+          contentLength: req.body?.content?.length || 0,
+          lineCount: req.body?.lineCount,
+          pageNumber: req.body?.pageNumber,
+        });
+      }
+      
+      const content = safeStr(req.body?.content || "").trim();
+      const lineCount = Number(req.body?.lineCount) || 0;
+      const pageNumber = Number(req.body?.pageNumber) || 1;
+      
+      // Cho phép content rỗng (có thể là paper trống)
+      // Chỉ validate nếu content là null hoặc undefined
+      if (req.body?.content === null || req.body?.content === undefined) {
+        return res.status(400).json({
+          error: "CONTENT_REQUIRED",
+          message: "Content field is required (can be empty string)",
+        });
+      }
+
+      // Tạo folder content_for_AI tại đường dẫn tuyệt đối
+      const contentDir = "C:\\Users\\HP\\OneDrive\\Máy tính\\AI_Agent\\content_for_AI";
+      if (!fs.existsSync(contentDir)) {
+        fs.mkdirSync(contentDir, { recursive: true });
+      }
+
+      // Format ngày tháng năm theo giờ Việt Nam
+      const now = new Date();
+      // Chuyển sang giờ Việt Nam (UTC+7)
+      const vietnamTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      const dayNames = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+      const dayName = dayNames[vietnamTime.getUTCDay()];
+      
+      // Format ngày: DD/MM/YYYY
+      const day = String(vietnamTime.getUTCDate()).padStart(2, "0");
+      const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, "0");
+      const year = vietnamTime.getUTCFullYear();
+      const displayDateStr = `${day}/${month}/${year}`;
+      
+      // Format giờ: HH:MM:SS
+      const hours = String(vietnamTime.getUTCHours()).padStart(2, "0");
+      const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, "0");
+      const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, "0");
+      const displayTimeStr = `${hours}:${minutes}:${seconds}`;
+
+      // Tên file cố định - mỗi lần snapshot sẽ ghi đè file này
+      const filename = "paper_snapshot.txt";
+      const filepath = path.join(contentDir, filename);
+
+      // Format nội dung với số dòng ở đầu mỗi dòng
+      const contentLines = content.split("\n");
+      const numberedContent = contentLines
+        .map((line, index) => {
+          const lineNumber = index + 1;
+          return `[dòng:${lineNumber}] ${line}`;
+        })
+        .join("\n");
+
+      // Format nội dung file với metadata và prompt
+      const fileContent = `=== PAPER SNAPSHOT - AI DATA SOURCE ===
+Lưu ý: File này được ghi đè mỗi lần snapshot. Chỉ giữ lại bản snapshot mới nhất.
+
+METADATA:
+- Thứ: ${dayName}
+- Ngày: ${displayDateStr}
+- Giờ: ${displayTimeStr}
+- Số dòng: ${lineCount}
+- Trang: ${pageNumber}
+
+=== PROMPT FOR AI ===
+Đây là dữ liệu được snapshot từ vùng paper (writing pane) trong hệ thống web hiện tại.
+Vùng paper là một editor với giao diện giống tờ giấy có dòng kẻ, số dòng bên trái, và hỗ trợ soạn thảo văn bản.
+Dữ liệu này được lưu để làm nguồn dữ liệu cho AI đọc và xử lý.
+
+=== CONTENT ===
+${numberedContent}
+
+=== END OF SNAPSHOT ===
+`;
+
+      // Lưu file (ghi đè nếu file đã tồn tại)
+      fs.writeFileSync(filepath, fileContent, "utf8");
+
+      console.log(`[${isoNow()}] ✅ Paper snapshot saved: ${filename} (${lineCount} lines, page ${pageNumber}, ${displayDateStr} ${displayTimeStr})`);
+
+      return res.json({
+        ok: true,
+        filename,
+        filepath: `content_for_AI/${filename}`,
+        lineCount,
+        pageNumber,
+        date: displayDateStr,
+        time: displayTimeStr,
+      });
+    } catch (e) {
+      console.error(`[${isoNow()}] ❌ Failed to save paper snapshot:`, e.message);
+      return res.status(500).json({
+        error: "SNAPSHOT_FAILED",
+        message: `Failed to save snapshot: ${e.message}`,
+      });
+    }
+  }
+);
+
+// Error handler cho route này - đảm bảo luôn trả về JSON
+app.use("/api/paper/snapshot", (err, req, res, next) => {
+  console.error(`[${isoNow()}] Paper snapshot route error:`, err.message);
+  res.setHeader("Content-Type", "application/json");
+  return res.status(500).json({
+    error: "SNAPSHOT_ERROR",
+    message: err.message || "An error occurred while processing snapshot",
+  });
 });
 
 // ---------------- API: stream SSE ---------------- 
@@ -783,12 +1054,69 @@ app.get("/api/chat/stream", async (req, res) => {
   }
 });
 
+// ---------------- Helper: Read Paper Snapshot ---------------- 
+async function readPaperSnapshot() {
+  try {
+    const contentDir = "C:\\Users\\HP\\OneDrive\\Máy tính\\AI_Agent\\content_for_AI";
+    const filename = "paper_snapshot.txt";
+    const filepath = path.join(contentDir, filename);
+
+    if (!fs.existsSync(filepath)) {
+      return null; // File chưa tồn tại
+    }
+
+    const fileContent = fs.readFileSync(filepath, "utf8");
+    return fileContent;
+  } catch (e) {
+    console.warn(`[${isoNow()}] ⚠️ Failed to read paper snapshot:`, e.message);
+    return null;
+  }
+}
+
+// ---------------- Helper: Check if message asks about paper ---------------- 
+function asksAboutPaper(message) {
+  const lowerMessage = message.toLowerCase();
+  const paperKeywords = [
+    "paper", "giấy", "snapshot", "vùng paper", "writing pane",
+    "nội dung paper", "dữ liệu paper", "file snapshot", "paper snapshot",
+    "đọc paper", "xem paper", "nội dung trong paper", "dòng trong paper"
+  ];
+  return paperKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 // ---------------- Upstream OpenAI streaming ---------------- 
 async function startUpstream(sid, req) {
   const job = jobs.get(sid);
   if (!job) return;
 
-  const input = [{ role: "system", content: SYSTEM_PROMPT }];
+  // Chỉ đọc paper snapshot nếu user hỏi về paper
+  let systemContent = SYSTEM_PROMPT;
+  
+  // Thông báo cho AI về khả năng đọc paper snapshot
+  systemContent += "\n\n" +
+    "=== HỆ THỐNG WEB ===\n" +
+    "Bạn đang hoạt động trong hệ thống web có vùng paper (writing pane) - một editor giống tờ giấy có dòng kẻ.\n" +
+    "Hệ thống có khả năng đọc file snapshot từ vùng paper khi bạn cần.\n" +
+    "Nếu người dùng hỏi về nội dung trong paper, bạn có thể yêu cầu hệ thống đọc file snapshot.\n" +
+    "Chỉ yêu cầu đọc khi thực sự cần thiết để trả lời câu hỏi của người dùng về nội dung paper.";
+  
+  // Kiểm tra xem user có hỏi về paper không
+  const userAsksAboutPaper = asksAboutPaper(job.message);
+  
+  if (userAsksAboutPaper) {
+    const paperSnapshot = await readPaperSnapshot();
+    if (paperSnapshot) {
+      systemContent += "\n\n" +
+        "=== PAPER SNAPSHOT (Đã đọc theo yêu cầu) ===\n" +
+        paperSnapshot;
+    } else {
+      systemContent += "\n\n" +
+        "=== PAPER SNAPSHOT ===\n" +
+        "File snapshot chưa tồn tại hoặc chưa được tạo. Người dùng cần tạo snapshot trước.";
+    }
+  }
+
+  const input = [{ role: "system", content: systemContent }];
 
   for (const m of job.history) {
     if (!m || typeof m !== "object") continue;
@@ -829,13 +1157,35 @@ async function startUpstreamWithUptime(sid, req) {
       `now=${u.now_iso}\n`
     : `\n[Tool result: online_time]\nmissing_session\n`;
 
+  // Thông báo cho AI về khả năng đọc paper snapshot
+  let paperContext = "\n\n=== HỆ THỐNG WEB ===\n" +
+    "Bạn đang hoạt động trong hệ thống web có vùng paper (writing pane) - một editor giống tờ giấy có dòng kẻ.\n" +
+    "Hệ thống có khả năng đọc file snapshot từ vùng paper khi bạn cần.\n" +
+    "Nếu người dùng hỏi về nội dung trong paper, bạn có thể yêu cầu hệ thống đọc file snapshot.\n" +
+    "Chỉ yêu cầu đọc khi thực sự cần thiết để trả lời câu hỏi của người dùng về nội dung paper.";
+  
+  // Chỉ đọc paper snapshot nếu user hỏi về paper
+  const userAsksAboutPaper = asksAboutPaper(job.message);
+  
+  if (userAsksAboutPaper) {
+    const paperSnapshot = await readPaperSnapshot();
+    if (paperSnapshot) {
+      paperContext += "\n\n=== PAPER SNAPSHOT (Đã đọc theo yêu cầu) ===\n" +
+        paperSnapshot;
+    } else {
+      paperContext += "\n\n=== PAPER SNAPSHOT ===\n" +
+        "File snapshot chưa tồn tại hoặc chưa được tạo. Người dùng cần tạo snapshot trước.";
+    }
+  }
+
   // system prompt: bắt buộc dùng tool result, không đoán
   const system = (
     SYSTEM_PROMPT +
     "\n\n" +
     "If the user asks about how long they have been online in this web app, you MUST use the provided [Tool result: online_time]. " +
     "Do not guess. If tool result is missing, say you cannot determine it.\n" +
-    toolLine
+    toolLine +
+    paperContext
   );
 
   // Build input giống startUpstream, chỉ khác system
@@ -1190,8 +1540,12 @@ const server = app.listen(PORT, () => {
   console.log(`\n✅ Backend API server running: http://localhost:${PORT}`);
   console.log(`   Models: ${AVAILABLE_MODELS.map(m => m.value).join(", ")}`);
   console.log(`   OpenAI API Key: [CONFIGURED]`);
-  if (clerkClient) {
-    console.log(`   Clerk: ✅ Enabled`);
+  if (clerkClient && clerkMiddleware) {
+    console.log(`   Clerk: ✅ Enabled (with authentication)`);
+  } else if (process.env.CLERK_SECRET_KEY && !process.env.CLERK_PUBLISHABLE_KEY) {
+    console.log(`   Clerk: ⚠️  Partially configured (CLERK_PUBLISHABLE_KEY missing)`);
+  } else if (process.env.CLERK_SECRET_KEY && !hasClerkDependencies()) {
+    console.log(`   Clerk: ⚠️  Not configured (Clerk dependencies missing)`);
   } else {
     console.log(`   Clerk: ⚠️  Not configured (CLERK_SECRET_KEY missing)`);
   }
@@ -1208,6 +1562,10 @@ const server = app.listen(PORT, () => {
   }
   console.log(`   Timeout: Disabled (no timeout)`);
   console.log(`   Keep-Alive: 65s`);
+  console.log(`   API Routes:`);
+  console.log(`     - POST /api/chat/create`);
+  console.log(`     - GET  /api/chat/stream`);
+  console.log(`     - POST /api/paper/snapshot`);
   console.log();
 });
 

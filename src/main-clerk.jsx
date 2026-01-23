@@ -3,14 +3,17 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css"; // Import CSS để Vite inject vào
 import ClerkWrapper from "./ClerkWrapper.jsx";
+import { RailProvider } from "./RailContext.jsx";
 import App from "./App.jsx";
 
 // Tạo wrapper để mount Clerk UI + React App
 function AppWrapper({ clerkKey }) {
   return (
     <ClerkWrapper publishableKey={clerkKey}>
-      {/* Mount React App component */}
-      <App />
+      <RailProvider>
+        {/* Mount React App component */}
+        <App />
+      </RailProvider>
     </ClerkWrapper>
   );
 }

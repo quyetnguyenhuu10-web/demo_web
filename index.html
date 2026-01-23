@@ -82,19 +82,52 @@
   <!-- CSS chính - script trên đã set inline style cho CSS variables -->
   <style>
     :root{
-      /* Warm paper base */
-      --bg: #f5f1ea;         /* nền chính: giấy ấm */
-      --bg-soft: #f7f3ed;    /* pane trái */
-      --pane: #f1ece4;
+      /* ===== Core Surfaces ===== */
+      --desk: #EEEAE2;                 /* Middle pane backdrop (desk) */
+      --desk-deep: #E4DED5;            /* vignette/edges */
+      --desk-top-wash: #F3EFE7;        /* desk top wash - sáng hơn ở mép trên */
+      --bg: var(--desk);               /* keep compatibility */
+      --bg-soft: #F1EDE6;              /* left pane base */
+      --panel: #F3EFE7;                /* chat panel base */
+      --panel-2: #EEE8DE;              /* inner surfaces */
+      --header-wash-start: rgba(255,255,255,0.45); /* Header wash start */
+      --header-wash-mid: rgba(255,255,255,0.15);   /* Header wash mid */
+      --rail-top-wash: rgba(255,255,255,0.15);     /* Rail top wash */
 
-      /* Panels */
-      --panel: #fbf8f3;      /* panel chat: sáng nhưng không trắng gắt */
-      --panel-soft: #fdfaf6;
-      --panel-stone: #f3eee6;
+      /* ===== Paper (Hero Writing Surface) ===== */
+      --paper: #FFFCF6;                /* premium neutral ivory */
+      --paper-tint: #F7F2E9;           /* subtle wash */
+      --paper-edge: rgba(28,26,23,0.10);
+      --paper-inner: rgba(255,255,255,0.78);
+      --paper-text: rgba(27,25,22,0.89); /* Giảm contrast 2-3% (0.92→0.89), thêm chút brown/olive thay vì neutral gray */
+      --paper-inner-warm: #FBF7EE;     /* Paper inner warm layer */
+      --paper-cool-break: #FAF6EF;     /* Paper cool break layer */
+      --paper-top-highlight-start: rgba(255,255,255,0.75); /* Top edge highlight start */
+      --paper-top-highlight-mid: rgba(255,255,255,0.35);   /* Top edge highlight mid */
+      --paper-bottom-lift: rgba(255,255,255,0.06);          /* Bottom lift highlight */
 
-      /* Text */
-      --text: #1c1a17;       /* charcoal ấm */
-      --muted: #6c625a;      /* xám ấm */
+      /* ===== Ink System v2 - "BÚT BI MẢNH" (LIGHT) ===== */
+      /* Ink palette - NHẠT + TRUNG TÍNH HƠN (giảm 1 level so với cũ) */
+      --ink-core: #3A3530;
+      --ink-mid: #45403A;
+      --ink-soft: #504A43;
+      --ink-edge: #6A635A;
+      /* Text fill gradient - CHỈ 2 STOP, RẤT NHẸ (không có middle) */
+      --ink-gradient-top: #3A3530;
+      --ink-gradient-bottom: #45403A;
+      /* Edge handling - GIẢM CỰC MẠNH, không outer feather */
+      --ink-edge-blend: rgba(106, 99, 90, 0.28); /* rgba(#6A635A, 0.28) */
+      /* Selection highlight - Giảm opacity để không "đè mực" */
+      --selection-bg-ink: rgba(210, 195, 165, 0.22);
+      --selection-edge-ink: rgba(150, 120, 80, 0.18);
+      /* Caret */
+      --caret-ink: rgba(90, 75, 55, 0.65);
+
+      /* ===== Typography ===== */
+      --text: #1B1916;
+      --muted: rgba(27,25,22,0.58);
+      --muted-2: rgba(27,25,22,0.42);
+      --header-text: rgba(27,25,22,0.60); /* Header text với độ đậm cao hơn để dễ đọc */
       --placeholder: #8a8077;
 
       /* ===== Bubbles (LIGHT) ===== */
@@ -106,17 +139,74 @@
       /* AI: text block (document-like, không bubble) */
       --aiText: rgba(28,26,23,0.92);
       
-      /* Borders: rất nhẹ, tinh tế */
-      --border: rgba(28,26,23,0.10);
-      --border-soft: rgba(28,26,23,0.16);
+      /* ===== Borders / Dividers ===== */
+      --border: rgba(27,25,22,0.12);
+      --border-soft: rgba(27,25,22,0.08);
+      --divider: rgba(27,25,22,0.10);
 
-      /* Accent: beige-gold nhẹ */
-      --accent: #b79f7a;
+      /* ===== Accent ===== */
+      --accent: #B59A6A;               /* champagne */
+      --accent-2: #8EAA9A;             /* sage */
+      --accent-ring: rgba(181,154,106,0.26);
 
-      /* Shadow: mềm, không nặng */
-      --shadow-soft:
-        0 1px 2px rgba(28,26,23,0.05),
-        0 10px 26px rgba(28,26,23,0.08);
+      /* ===== Interactions ===== */
+      --hover: rgba(27,25,22,0.04);
+      --active: rgba(27,25,22,0.07);
+      --focus: rgba(181,154,106,0.22);
+
+      /* ===== Send Button (Primary Action) ===== */
+      --send-bg: #1B1916;                    /* warm charcoal */
+      --send-fg: #FFFCF6;                    /* paper white */
+      --send-border: rgba(0,0,0,0.18);
+      --send-hover-bg: #2A2723;              /* nhấc sáng nhẹ */
+      --send-active-bg: #141210;             /* nhấn xuống */
+      --send-disabled-bg: rgba(27,25,22,0.32);
+      --send-disabled-fg: rgba(255,252,246,0.55);
+      --send-shadow: 0 6px 16px rgba(0,0,0,0.28);
+
+      /* ===== Copy Button (Hover / Active / Copied) ===== */
+      --copy-hover-bg: rgba(27,25,22,0.06);
+      --copy-active-bg: rgba(27,25,22,0.10);
+      --copy-fg: rgba(27,25,22,0.75);
+      --copy-fg-active: rgba(27,25,22,0.92);
+      --copy-success: #8EAA9A;               /* sage – calm success */
+      --copy-success-bg: rgba(142,170,154,0.18);
+
+      /* ===== Dropdown Underline (Model Selector / Menu) ===== */
+      --dropdown-underline: rgba(181,154,106,0.55);   /* champagne */
+      --dropdown-underline-hover: rgba(181,154,106,0.78);
+      --dropdown-underline-active: #B59A6A;
+      --dropdown-item-fg: rgba(27,25,22,0.88);
+      --dropdown-item-muted: rgba(27,25,22,0.52);
+
+      /* ===== Selection Highlight (Text Selection) ===== */
+      --selection-bg: rgba(181,154,106,0.28);   /* champagne wash */
+      --selection-fg: #1B1916;
+      --selection-ui-bg: rgba(181,154,106,0.18);
+      /* Ink-specific selection (for paper editor) */
+      --selection-bg-ink: rgba(196, 176, 140, 0.28);
+      --selection-edge-ink: rgba(150, 120, 80, 0.18);
+
+      /* ===== Focus Ring (Keyboard / Accessibility) ===== */
+      --focus-ring: 0 0 0 3px rgba(181,154,106,0.26);
+
+      /* ===== WritingPane Lines ===== */
+      --grid: rgba(27,25,22,0.094); /* Giảm 15% từ 0.11 */
+      --grid-strong: rgba(27,25,22,0.128); /* Giảm 15% từ 0.15 */
+      --margin: rgba(120, 62, 58, 0.16);
+
+      /* ===== Shadows (Paper wins) ===== */
+      --shadow-paper: 0 24px 80px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12);
+      --shadow-panel: -8px 0 18px rgba(0,0,0,0.10), -2px 0 6px rgba(0,0,0,0.06);
+      --shadow-soft: 0 8px 26px rgba(0,0,0,0.10);
+      /* Paper side shadows - ambient color với fade dọc */
+      --paper-shadow-side-start: rgba(0,0,0,0);
+      --paper-shadow-side-15: rgba(0,0,0,0.02);
+      --paper-shadow-side-40: rgba(0,0,0,0.04);
+      --paper-shadow-side-65: rgba(0,0,0,0.06);
+      --paper-shadow-side-85: rgba(0,0,0,0.08);
+      --paper-shadow-side-95: rgba(0,0,0,0.10);
+      --paper-shadow-side-end: rgba(0,0,0,0.08);
 
       --msg-top-inset: 5px;
 
@@ -134,57 +224,102 @@
          TOPBAR + CLOCK — LIGHT
          ========================= */
 
-      /* Topbar: warm paper */
-      --topbar-a: #fbf6ee;          /* giấy sáng */
-      --topbar-b: #f0e6d6;          /* giấy đậm nhẹ */
-      --topbar-fg: #1c1a17;         /* chữ charcoal ấm */
-      --topbar-border: rgba(28,26,23,0.12);
-      --topbar-glass: rgba(255,255,255,0.65);
+      /* Topbar: match desk */
+      --topbar-a: #EEEAE2;                       /* match desk */
+      --topbar-b: #F2EEE7;                       /* slightly lifted */
+      --topbar-fg: var(--text);
+      --topbar-border: rgba(27,25,22,0.10);
+      --topbar-glass: rgba(255,255,255,0.52);
 
-      /* Clock: champagne */
-      --clock-fg: #1c1a17;          /* chữ giờ */
-      --clock-icon: #d4b77c;       /* champagne gold */
-      --clock-border: rgba(212,183,124,0.45);
-      --clock-glass: rgba(212,183,124,0.18);
+      /* Clock (NO-PILL) — COLOR SPEC */
+      --clock-bg: transparent;
+      --clock-border: transparent;
+      --clock-fg: rgba(60, 54, 48, 0.55); /* Time text - đọc được nhưng nhẹ hơn header meta */
+      --clock-icon: rgba(60, 54, 48, 0.40); /* Icon nhẹ hơn text 1 nấc */
+      --clock-fg-hover: rgba(60, 54, 48, 0.68); /* Hover text */
+      --clock-icon-hover: rgba(60, 54, 48, 0.52); /* Hover icon */
 
-      /* Model selector accent (champagne gold) */
-      --model-accent: rgba(212,183,124,0.22);
-      --model-accent-border: rgba(212,183,124,0.35);
-      --model-accent-ring: rgba(212,183,124,0.20);
-      --model-accent-hover: rgba(212,183,124,0.12);
-      /* Model selector - Light mode colors */
-      --model-bg: #f0e6d6; /* Nền giấy ấm */
-      --model-bg-hover: #e8dcc8; /* Hover đậm hơn một chút */
-      /* Text colors - Light mode */
-      --model-fg-main: #1C1A17; /* Warm charcoal - đủ tương phản nhưng không đen gắt */
-      --model-fg-muted: rgba(28, 26, 23, 0.55); /* Chữ phụ - nhẹ, không gây nhiễu */
-      /* Tick và gạch chân - Light mode */
-      --model-tick: #B79F7A; /* Champagne/beige-gold nhạt - ấm, sang, nổi vừa đủ */
-      --model-underline: rgba(183, 159, 122, 0.60); /* Cùng hue với tick nhưng mờ hơn */
-      /* Border - Light mode */
-      --model-border-subtle: rgba(28, 26, 23, 0.10); /* Viền nhẹ nếu cần */
+      /* Pills */
+      --pill-hover: rgba(27,25,22,0.05);
+      --pill-active: rgba(27,25,22,0.08);
 
-      /* ===== Scrollbar (LIGHT) ===== */
-      --sb-track: rgba(28,26,23,0.06);
-      --sb-thumb: rgba(28,26,23,0.22);
-      --sb-thumb-hover: rgba(28,26,23,0.32);
+      /* ===== Chat Panel System (Model Selector / Dropdown / Composer) ===== */
+      --chat-bg: var(--panel);
+      --chat-border: rgba(27,25,22,0.10);
+      --chat-fg: var(--text);
+      --chat-muted: var(--muted);
+
+      --model-bg: rgba(255,255,255,0.50);
+      --model-bg-hover: rgba(255,255,255,0.66);
+      --model-fg-main: var(--text);
+      --model-fg-muted: var(--muted);
+      --model-border-subtle: rgba(27,25,22,0.12);
+      --model-hover: rgba(27,25,22,0.04);
+      --model-active: rgba(27,25,22,0.07);
+      --model-tick: #B59A6A;
+      --model-accent: #8EAA9A;
+      --model-accent-ring: rgba(142,170,154,0.22);
+
+      /* ===== Scrollbar Rail (LIGHT) - Neutral Ivory ===== */
+      --rail-base: #E7E1D8;                    /* Rail base - tối hơn desk 1 nấc */
+      --rail-wash-top: #EEE8DF;                /* Rail inner wash top */
+      --rail-wash-mid: #E3DDD4;                /* Rail inner wash mid */
+      --rail-wash-bot: #DED7CD;                /* Rail inner wash bot */
+      --rail-edge: rgba(27,25,22,0.08);        /* Rail edge line */
+      --rail-edge-soft: rgba(27,25,22,0.05);   /* Rail edge soft */
+      --sb-track: var(--rail-base);            /* Track dùng rail base */
+      --sb-thumb: rgba(27,25,22,0.20);         /* THUMB */
+      --sb-thumb-hover: rgba(27,25,22,0.28);   /* THUMB_HOVER */
     }
 
     :root[data-theme="dark"]{
-      /* Warm charcoal base */
-      --bg: #0f0e0d;         /* nền tổng thể: than ấm */
-      --bg-soft: #141210;    /* pane trái: ấm, không xanh */
-      --pane: #171412;
+      /* ===== Core Surfaces ===== */
+      --desk: #141210;                 /* Desk base - tối hơn paper để paper nổi */
+      --desk-deep: #100F0D;            /* Desk bottom - tối nhất */
+      --desk-top-wash: #141210;        /* Desk top wash - dark mode (cùng với desk base) */
+      --bg: var(--desk);
+      --bg-soft: #0F0E0C;              /* left pane base */
+      --panel: #12110F;                /* chat panel base */
+      --panel-2: #151310;
+      --header-wash-start: rgba(255,255,255,0.08); /* Header wash start - dark mode */
+      --header-wash-mid: rgba(255,255,255,0.04);    /* Header wash mid - dark mode */
+      --rail-top-wash: rgba(255,255,255,0.06);      /* Rail top wash - dark mode */
 
-      /* Panels */
-      --panel: #141210;      /* chat panel */
-      --panel-soft: #171412;
-      --panel-stone: #1c1916;
+      /* ===== Paper (Hero Writing Surface) ===== */
+      --paper: #1E1B17;                /* breathable dark ivory */
+      --paper-tint: #221E1A;
+      --paper-edge: rgba(255,255,255,0.10);
+      --paper-inner: rgba(255,255,255,0.07);
+      --paper-text: rgba(236,230,221,0.87); /* Giảm contrast 2-3% (0.90→0.87) cho dark mode */
+      --paper-inner-warm: #211D19;     /* Paper inner warm layer - dark mode */
+      --paper-cool-break: #1F1C18;     /* Paper cool break layer - dark mode */
+      --paper-top-highlight-start: rgba(255,255,255,0.12); /* Top edge highlight start - dark mode */
+      --paper-top-highlight-mid: rgba(255,255,255,0.06);    /* Top edge highlight mid - dark mode */
+      --paper-bottom-lift: rgba(255,255,255,0.04);          /* Bottom lift highlight - dark mode */
 
-      /* Text */
-      --text: #ece6dd;       /* trắng ngà */
-      --muted: #b9b0a6;      /* xám ấm */
+      /* ===== Typography ===== */
+      --text: #ECE6DD;
+      --muted: rgba(236,230,221,0.68);
+      --muted-2: rgba(236,230,221,0.52);
+      --header-text: rgba(236,230,221,0.70); /* Header text với độ đậm cao hơn để dễ đọc - dark mode */
       --placeholder: #8f877f;
+
+      /* ===== Ink System v2 - "BÚT BI MẢNH" (DARK) ===== */
+      /* Ink palette - Sáng hơn cho dark mode, nhưng vẫn mảnh */
+      --ink-core: #C4BDB5;
+      --ink-mid: #D0C9C1;
+      --ink-soft: #D8D1C9;
+      --ink-edge: #E0D9D1;
+      /* Text fill gradient - CHỈ 2 STOP, RẤT NHẸ (không có middle) */
+      --ink-gradient-top: #C4BDB5;
+      --ink-gradient-bottom: #D0C9C1;
+      /* Edge handling - GIẢM CỰC MẠNH, không outer feather */
+      --ink-edge-blend: rgba(224, 217, 209, 0.28); /* rgba(#E0D9D1, 0.28) */
+      /* Selection highlight - Giảm opacity để không "đè mực" */
+      --selection-bg-ink: rgba(210, 195, 165, 0.22);
+      --selection-edge-ink: rgba(150, 120, 80, 0.18);
+      /* Caret */
+      --caret-ink: rgba(230, 220, 200, 0.75);
 
       /* ===== Bubbles (DARK) ===== */
       /* User: warm cocoa (nổi trên panel tối) */
@@ -195,55 +330,110 @@
       /* AI: text block (document-like, không bubble) */
       --aiText: rgba(236,230,221,0.92);
 
-      /* Borders */
-      --border: rgba(236,230,221,0.10);
-      --border-soft: rgba(236,230,221,0.16);
+      /* ===== Borders / Dividers ===== */
+      --border: rgba(255,255,255,0.12);
+      --border-soft: rgba(255,255,255,0.08);
+      --divider: rgba(255,255,255,0.10);
 
-      /* Accent (ấm, nhẹ) */
-      --accent: #c9b79c;     /* beige-gold rất nhẹ */
+      /* ===== Accent ===== */
+      --accent: #9FB7A6;               /* sage */
+      --accent-2: #D6BE8A;             /* warm gold light */
+      --accent-ring: rgba(159,183,166,0.22);
 
-      /* Shadow: mềm, ít tương phản */
-      --shadow-soft:
-        0 1px 2px rgba(0,0,0,0.35),
-        0 10px 28px rgba(0,0,0,0.45);
+      /* ===== Interactions ===== */
+      --hover: rgba(255,255,255,0.06);
+      --active: rgba(255,255,255,0.10);
+      --focus: rgba(159,183,166,0.22);
+
+      /* ===== Send Button (Primary Action) ===== */
+      --send-bg: #ECE6DD;                    /* off-white ấm */
+      --send-fg: #141210;                    /* ink tối */
+      --send-hover-bg: #F3EDE4;              /* sáng hơn chút */
+      --send-active-bg: #E0D8CB;
+      --send-disabled-bg: rgba(236,230,221,0.34);
+      --send-disabled-fg: rgba(20,18,16,0.55);
+      --send-shadow: 0 6px 18px rgba(0,0,0,0.58);
+
+      /* ===== Copy Button (Hover / Active / Copied) ===== */
+      --copy-hover-bg: rgba(255,255,255,0.08);
+      --copy-active-bg: rgba(255,255,255,0.12);
+      --copy-fg: rgba(236,230,221,0.75);
+      --copy-fg-active: rgba(236,230,221,0.92);
+      --copy-success: #9FB7A6;
+      --copy-success-bg: rgba(159,183,166,0.22);
+
+      /* ===== Dropdown Underline (Model Selector / Menu) ===== */
+      --dropdown-underline: rgba(214,190,138,0.55);   /* warm gold */
+      --dropdown-underline-hover: rgba(214,190,138,0.78);
+      --dropdown-underline-active: #D6BE8A;
+      --dropdown-item-fg: rgba(236,230,221,0.88);
+      --dropdown-item-muted: rgba(236,230,221,0.56);
+
+      /* ===== Selection Highlight (Text Selection) ===== */
+      --selection-bg: rgba(214,190,138,0.22);   /* gold wash */
+      --selection-fg: #ECE6DD;
+      --selection-ui-bg: rgba(159,183,166,0.18);
+
+      /* ===== Focus Ring (Keyboard / Accessibility) ===== */
+      --focus-ring: 0 0 0 3px rgba(159,183,166,0.26);
+
+      /* ===== WritingPane Lines ===== */
+      --grid: rgba(200, 190, 175, 0.14); /* Grid line - dark mode */
+      --grid-strong: rgba(200, 190, 175, 0.18); /* Grid strong - dark mode */
+      --margin: rgba(160, 88, 78, 0.22);
+
+      /* ===== Shadows (Paper wins) ===== */
+      --shadow-paper: 0 24px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.30);
+      --shadow-panel: -10px 0 22px rgba(0,0,0,0.42), -2px 0 8px rgba(0,0,0,0.26);
+      --shadow-soft: 0 10px 30px rgba(0,0,0,0.46);
+      /* Paper side shadows - dark mode (sáng hơn để tạo contrast trên nền tối) */
+      --paper-shadow-side-start: rgba(255,255,255,0);
+      --paper-shadow-side-15: rgba(255,255,255,0.01);
+      --paper-shadow-side-40: rgba(255,255,255,0.02);
+      --paper-shadow-side-65: rgba(255,255,255,0.03);
+      --paper-shadow-side-85: rgba(255,255,255,0.04);
+      --paper-shadow-side-95: rgba(255,255,255,0.05);
+      --paper-shadow-side-end: rgba(255,255,255,0.04);
 
       /* =========================
          TOPBAR + CLOCK — DARK
          ========================= */
 
-      /* Topbar: warm charcoal */
-      --topbar-a: #0e0d0c;
-      --topbar-b: #161311;
-      --topbar-fg: #ece6dd;        /* ivory */
+      /* Topbar */
+      --topbar-a: #0B0A09;
+      --topbar-b: #141210;
+      --topbar-fg: var(--text);
       --topbar-border: rgba(255,255,255,0.14);
       --topbar-glass: rgba(255,255,255,0.08);
 
-      /* Clock: ĐEN HẲN - chuẩn editor cao cấp */
-      --clock-bg: #141210;         /* Đen ấm, cùng họ với panel/chat */
-      --clock-border: rgba(255,255,255,0.12); /* Viền */
-      --clock-fg: #ECE6DD;         /* Chữ giờ */
-      --clock-icon: rgba(236,230,221,0.75); /* Icon/kim đồng hồ */
-      --clock-accent: #9FB7A6;      /* Accent rất nhẹ (nếu cần) */
-      /* Legacy variables - giữ để tương thích */
-      --clock-glass: rgba(159,183,166,0.14);
+      /* Clock (NO-PILL) — COLOR SPEC */
+      --clock-bg: transparent;
+      --clock-border: transparent;
+      --clock-fg: rgba(232, 225, 214, 0.62); /* Time text - không trắng tinh, không glow */
+      --clock-icon: rgba(232, 225, 214, 0.44); /* Icon */
+      --clock-fg-hover: rgba(232, 225, 214, 0.76); /* Hover text */
+      --clock-icon-hover: rgba(232, 225, 214, 0.56); /* Hover icon */
 
-      /* Model selector accent (sage) */
-      --model-accent: rgba(159,183,166,0.18);
-      --model-accent-border: rgba(159,183,166,0.32);
-      --model-accent-ring: rgba(159,183,166,0.24);
-      --model-accent-hover: rgba(159,183,166,0.10);
-      /* Model selector - VS Code / Linear / Cursor style */
-      --model-fg-main: #ECE6DD; /* Text chính: off-white ấm */
-      --model-fg-muted: rgba(236,230,221,0.65); /* Text phụ */
-      --model-border-subtle: rgba(255,255,255,0.12); /* Viền */
-      --model-hover: rgba(255,255,255,0.08); /* Hover */
-      --model-active: rgba(255,255,255,0.12); /* Active */
-      --model-accent: #9FB7A6; /* Accent: sage khói */
-      /* Background: đen sâu premium */
-      --model-bg: #0a0a0a; /* Đen sâu */
-      --model-bg-hover: #0d0d0d; /* Hover sáng hơn một chút */
-      /* Tick color */
+      /* Pills */
+      --pill-hover: rgba(255,255,255,0.06);
+      --pill-active: rgba(255,255,255,0.10);
+
+      /* ===== Chat Panel System (Model Selector / Dropdown / Composer) ===== */
+      --chat-bg: var(--panel);
+      --chat-border: rgba(255,255,255,0.12);
+      --chat-fg: var(--text);
+      --chat-muted: var(--muted);
+
+      --model-bg: rgba(255,255,255,0.06);
+      --model-bg-hover: rgba(255,255,255,0.10);
+      --model-fg-main: var(--text);
+      --model-fg-muted: var(--muted);
+      --model-border-subtle: rgba(255,255,255,0.12);
+      --model-hover: rgba(255,255,255,0.06);
+      --model-active: rgba(255,255,255,0.10);
       --model-tick: #ECE6DD;
+      --model-accent: #9FB7A6;
+      --model-accent-ring: rgba(159,183,166,0.22);
 
       /* ===== Scrollbar (DARK) ===== */
       --sb-track: rgba(236,230,221,0.06);
@@ -302,7 +492,10 @@
 
     /* ===== Topbar layout: clean (no system log) ===== */
     .topbar{
-      position:relative;
+      position:fixed;
+      top: 0;
+      left: 0;
+      right: 0;
       height: var(--topbar-h, 28px) !important; /* Fallback để tránh layout shift */
       width: 100% !important;
       max-width: 100% !important;
@@ -314,17 +507,32 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.08);
       margin: 0 !important;
       padding: 0 var(--topbar-pad-x, 10px) !important;
+      z-index: 1000;
 
       display:grid !important;
       grid-template-columns: 1fr 0fr 1fr;
       align-items:center;
+
+      /* System Rail v1.5 - Animation */
+      transform: translateY(0);
+      transition: transform 140ms ease-out, visibility 140ms ease-out;
+      will-change: transform;
+      visibility: visible;
     }
 
-    .tbLeft{ justify-self:start; display:flex; align-items:center; }
+    /* Focus mode - ẩn rail hoàn toàn */
+    .topbar[data-rail-hidden="true"]{
+      transform: translateY(calc(-1 * var(--topbar-h, 28px)));
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .tbLeft{ justify-self:start; display:flex; align-items:center; margin-left: calc(-1 * var(--topbar-pad-x, 10px)); } /* Để clockWidget chạm mép trái */
     .tbCenter{ justify-self:center; }
     .tbRight{ justify-self:end; display:flex; align-items:center; gap:10px; }
 
     .app{
+      margin-top: var(--topbar-h, 28px) !important; /* Offset cho topbar fixed */
       height: calc(100vh - var(--topbar-h, 28px)) !important; /* Fallback để tránh layout shift */
       height: calc(100dvh - var(--topbar-h, 28px)) !important;
       width: 100% !important;
@@ -332,17 +540,28 @@
       display:flex !important;
       gap: 0 !important; /* Không có gap */
       overflow:hidden !important;
-      margin: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      margin-bottom: 0 !important;
       padding: 0 !important;
       /* Tránh layout shift khi load */
       contain: layout;
+      /* System Rail v1.5 - Khi rail ẩn, app mở rộng */
+      transition: margin-top 140ms ease-out, height 140ms ease-out;
+    }
+
+    /* Focus mode - app mở rộng lên, không cần margin-top */
+    .app[data-rail-hidden="true"]{
+      margin-top: 0 !important;
+      height: 100vh !important;
+      height: 100dvh !important;
     }
 
     /* Phần giữa - fill khoảng trống */
     .middlePane{
       flex: 1 1 auto; /* Fill khoảng trống còn lại */
       min-width: 0;
-      background: var(--bg); /* Nền chính */
+      background: var(--desk); /* Middle pane backdrop (desk) */
       overflow: hidden;
     }
 
@@ -416,18 +635,10 @@
       background:var(--panel);
       /* Tránh layout shift khi load */
       contain: layout style;
-      box-shadow:
-        -10px 0 24px rgba(0,0,0,0.12),
-        -2px 0 6px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-panel);
       display:flex;
       flex-direction:column;
       position: relative; /* để gắn resizer */
-    }
-
-    :root[data-theme="dark"] .chat{
-      box-shadow:
-        -10px 0 24px rgba(0,0,0,0.50),
-        -2px 0 6px rgba(0,0,0,0.35);
     }
 
     .wrap{
@@ -544,7 +755,7 @@
       border:none;
       border-radius:6px;
       background:transparent;
-      color:#333;
+      color: var(--copy-fg);
       display:grid;
       place-items:center;
       cursor:pointer;
@@ -560,14 +771,24 @@
       pointer-events:auto;
     }
 
-    .copyBtn:hover{ background: rgba(28,26,23,0.06); }
-
-    :root[data-theme="dark"] .copyBtn{
-      color: #cbd5e1;
+    .copyBtn:hover{
+      background: var(--copy-hover-bg);
+      color: var(--copy-fg-active);
     }
 
-    :root[data-theme="dark"] .copyBtn:hover{
-      background: rgba(226,232,240,0.08);
+    .copyBtn:active{
+      background: var(--copy-active-bg);
+    }
+
+    /* Copied state - success */
+    .copyBtn[data-copied="true"]{
+      color: var(--copy-success);
+      background: var(--copy-success-bg);
+    }
+
+    .copyBtn:focus-visible{
+      outline: none;
+      box-shadow: var(--focus-ring);
     }
 
     .copyBtn::after{
@@ -696,7 +917,7 @@
 
     /* Focus: ring mềm với màu accent */
     .modelSelector:focus-visible {
-      box-shadow: 0 0 0 3px var(--model-accent-ring);
+      box-shadow: var(--focus-ring);
     }
 
     .modelSelector:disabled{
@@ -757,9 +978,7 @@
 
     .chatComposer:focus-within{
       border-color: var(--border-soft);
-      box-shadow:
-        0 0 0 3px rgba(111,143,175,0.14),
-        var(--shadow-soft);
+      box-shadow: var(--focus-ring), var(--shadow-soft);
     }
 
     .chatComposerInput{
@@ -821,9 +1040,11 @@
       height:var(--send-size);
       border-radius:50%;
       border:none;
-      background: #1c1a17;   /* charcoal ấm */
-      color: var(--panel);
+      background: var(--send-bg);
+      color: var(--send-fg);
       cursor:pointer;
+      box-shadow: var(--send-shadow);
+      transition: background 0.2s ease, box-shadow 0.2s ease;
 
       display:grid;
       place-items:center;
@@ -831,20 +1052,24 @@
       line-height:0;
     }
 
+    .chatSend:hover:not(:disabled){
+      background: var(--send-hover-bg);
+    }
+
+    .chatSend:active:not(:disabled){
+      background: var(--send-active-bg);
+    }
+
     .chatSend:disabled{
-      background: rgba(28,26,23,0.35);
-      color: rgba(251,248,243,0.85);
+      background: var(--send-disabled-bg);
+      color: var(--send-disabled-fg);
       cursor:not-allowed;
+      box-shadow: none;
     }
 
-    :root[data-theme="dark"] .chatSend{
-      background: #e6dccf;   /* beige sáng */
-      color: #141210;        /* chữ/icon tối */
-    }
-
-    :root[data-theme="dark"] .chatSend:disabled{
-      background: rgba(230,220,207,0.35);
-      color: rgba(20,18,16,0.55);
+    .chatSend:focus-visible{
+      outline: none;
+      box-shadow: var(--focus-ring), var(--send-shadow);
     }
 
     .sendIcon{
@@ -923,27 +1148,44 @@
       background: var(--accent);
     }
 
-    /* ===== Clock (kept) ===== */
+    /* ===== Clock (NO-PILL) ===== */
     .clockWidget{
-      height: var(--topbar-pill-h, 20px);
+      height: var(--topbar-h, 28px); /* Chiều cao bằng topbar */
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:0 10px;
-      border-radius:999px;
-
-      border: 1px solid var(--clock-border);
-      background: var(--clock-bg, var(--clock-glass)); /* Dùng --clock-bg nếu có, fallback về --clock-glass */
+      padding:0 10px 0 var(--topbar-pad-x, 10px); /* Padding trái bằng padding của topbar để chạm mép */
+      border: none;
+      background: transparent;
       color: var(--clock-fg);
 
       font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
+      font-weight: 700; /* Typographic micro-rules: 700-800 */
+      letter-spacing: 0.01em; /* Rất nhẹ */
       user-select:none;
+      transition: color 0.2s ease;
+      cursor: default;
     }
 
-    .clockSvg{ width:14px; height:14px; color: var(--clock-icon); }
-    #clockTime{ font-variant-numeric: tabular-nums; }
+    /* Hover state */
+    .clockWidget:hover{
+      color: var(--clock-fg-hover);
+    }
+
+    .clockWidget:hover .clockSvg{
+      color: var(--clock-icon-hover);
+    }
+
+    .clockSvg{ 
+      width:14px; 
+      height:14px; 
+      color: var(--clock-icon);
+      transition: color 0.2s ease;
+    }
+    
+    #clockTime{ 
+      font-variant-numeric: tabular-nums; /* Giữ tabular-nums để không "nhảy" bố cục */
+    }
 
     /* kim quay nhẹ */
     .clockHand{
@@ -1134,7 +1376,7 @@
       100%{ background-position:200% 0; }
     }
 
-    /* ===== Scrollbar styling (WebKit) ===== */
+    /* ===== Scrollbar Rail styling (WebKit) ===== */
     .scrollArea::-webkit-scrollbar{
       width: 10px;
     }
@@ -1146,9 +1388,16 @@
       height: 0;
     }
 
+    /* Scroll Rail - gradient dọc để tạo cảm giác rãnh, không phẳng */
     .scrollArea::-webkit-scrollbar-track{
-      background: var(--sb-track);
-      border-radius: 999px;
+      background: linear-gradient(to bottom,
+        var(--rail-wash-top) 0%,
+        var(--rail-wash-mid) 50%,
+        var(--rail-wash-bot) 100%
+      );
+      border-radius: 0; /* Bỏ border-radius để rail thẳng */
+      border-left: 1px solid var(--rail-edge-soft); /* Edge line nhẹ bên trái - chuyển mềm */
+      border-right: 1px solid var(--rail-edge); /* Edge line rõ hơn bên phải */
     }
 
     .chatComposerInput::-webkit-scrollbar-track{
@@ -1202,6 +1451,43 @@
     html::-webkit-scrollbar-thumb:hover{
       background: var(--sb-thumb-hover);
       background-clip: content-box;
+    }
+
+
+    /* ===== Selection Highlight (Text Selection) ===== */
+    /* Writing Pane - Paper selection (ink system v2) */
+    .writingPane ::selection,
+    .writingPane ::-moz-selection{
+      /* Background highlight - Giảm opacity để không "đè mực" */
+      background: var(--selection-bg-ink, rgba(210, 195, 165, 0.22));
+      /* Giữ nguyên ink gradient, không invert màu chữ */
+      color: inherit;
+    }
+
+    /* Chat / UI Selection (nhẹ hơn paper) */
+    .chat ::selection,
+    .chat ::-moz-selection,
+    .sidebarMenu ::selection,
+    .sidebarMenu ::-moz-selection,
+    body ::selection,
+    body ::-moz-selection{
+      background: var(--selection-ui-bg);
+      color: var(--text);
+    }
+
+    /* ===== Focus Ring (Keyboard / Accessibility) ===== */
+    /* Focus ring chỉ xuất hiện khi :focus-visible */
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    a:focus-visible{
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    .modelSelector:focus-visible {
+      box-shadow: var(--focus-ring);
     }
 
     /* =========================================================

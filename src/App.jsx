@@ -8,6 +8,8 @@ import { UI_CONFIG, buildApiUrl, buildApiHeaders, buildStreamUrl } from "./confi
 import { requireAuthorization, checkAuthorization } from "./auth-utils.js";
 import Toast from "./Toast.jsx";
 import SidebarMenu from "./SidebarMenu.jsx";
+import WritingPane from "./WritingPane.jsx";
+import { useRail } from "./RailContext";
 
 const FOLLOW_BOTTOM_THRESHOLD_PX = 140;
 
@@ -202,8 +204,8 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                   fontWeight: isSelected ? "700" : "500",
                   letterSpacing: "0.01em",
                   color: isSelected 
-                    ? (isDarkMode ? "#ECE6DD" : "#1C1A17") 
-                    : (isDarkMode ? "var(--model-fg-muted)" : "rgba(28, 26, 23, 0.55)"), /* Màu chữ theo theme */
+                    ? "var(--dropdown-item-fg)"
+                    : "var(--dropdown-item-muted)",
                   transition: "color 0.2s ease, text-decoration 0.2s ease, text-decoration-color 0.2s ease",
                   display: "flex",
                   alignItems: "center",
@@ -211,19 +213,17 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", "Roboto", system-ui, sans-serif',
                   textDecoration: isSelected ? "underline" : "none",
                   textDecorationColor: isSelected 
-                    ? (isDarkMode ? "rgba(212, 183, 124, 0.55)" : "rgba(183, 159, 122, 0.60)") 
-                    : "transparent", /* Màu gạch chân theo theme */
+                    ? "var(--dropdown-underline-active)"
+                    : "transparent",
                   textDecorationThickness: "1.5px",
                   textUnderlineOffset: "2px"
                 }}
                 onMouseEnter={(e) => {
                   const textSpan = e.currentTarget.querySelector('span:last-child');
                   if (textSpan && model.value !== selectedModel) {
-                    textSpan.style.color = isDarkMode ? "#ECE6DD" : "#1C1A17"; /* Màu chữ khi hover theo theme */
+                    textSpan.style.color = "var(--dropdown-item-fg)";
                     textSpan.style.textDecoration = "underline";
-                    textSpan.style.textDecorationColor = isDarkMode 
-                      ? "rgba(212, 183, 124, 0.55)" 
-                      : "rgba(183, 159, 122, 0.60)"; /* Màu gạch chân theo theme */
+                    textSpan.style.textDecorationColor = "var(--dropdown-underline-hover)";
                     textSpan.style.textDecorationThickness = "1.5px";
                     textSpan.style.textUnderlineOffset = "2px";
                   }
@@ -232,11 +232,11 @@ const ModelDropdown = ({ models, selectedModel, onSelect, disabled }) => {
                   const textSpan = e.currentTarget.querySelector('span:last-child');
                   if (textSpan) {
                     textSpan.style.color = model.value === selectedModel 
-                      ? (isDarkMode ? "#ECE6DD" : "#1C1A17")
-                      : (isDarkMode ? "var(--model-fg-muted)" : "rgba(28, 26, 23, 0.55)");
+                      ? "var(--dropdown-item-fg)"
+                      : "var(--dropdown-item-muted)";
                     textSpan.style.textDecoration = model.value === selectedModel ? "underline" : "none";
                     textSpan.style.textDecorationColor = model.value === selectedModel 
-                      ? (isDarkMode ? "rgba(212, 183, 124, 0.55)" : "rgba(183, 159, 122, 0.60)")
+                      ? "var(--dropdown-underline-active)"
                       : "transparent";
                   }
                 }}
@@ -519,6 +519,63 @@ export default function App() {
   
   // Clock state
   const [clockTime, setClockTime] = useState("--:--:--");
+
+  // System Rail state
+  const { isFocusMode, handleTopEdgeHover, exitFocusMode, enterFocusMode } = useRail();
+  const topbarRef = useRef(null);
+
+  // Update topbar data attribute khi rail state thay đổi
+  useEffect(() => {
+    const topbarEl = document.querySelector(".topbar[data-react='true']");
+    if (topbarEl) {
+      if (isFocusMode) {
+        topbarEl.setAttribute("data-rail-hidden", "true");
+      } else {
+        topbarEl.removeAttribute("data-rail-hidden");
+      }
+    }
+  }, [isFocusMode]);
+
+  // Detect mouse ở mép trên viewport để reveal rail (chỉ khi không ở focus mode)
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      // Chỉ reveal rail khi KHÔNG ở focus mode
+      if (!isFocusMode && e.clientY <= 20) {
+        handleTopEdgeHover();
+      }
+    };
+
+    // Handle hover ở topbar - prevent focus mode (chỉ khi không ở focus mode)
+    const handleTopbarMouseEnter = () => {
+      if (!isFocusMode) {
+        exitFocusMode();
+      }
+    };
+
+    // Handle ESC key để reveal rail (chỉ khi đang ở focus mode)
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isFocusMode) {
+        exitFocusMode();
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Listen hover ở topbar (chỉ khi topbar visible)
+    const topbarEl = topbarRef.current || document.querySelector(".topbar[data-react='true']");
+    if (topbarEl && !isFocusMode) {
+      topbarEl.addEventListener("mouseenter", handleTopbarMouseEnter);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyDown);
+      if (topbarEl) {
+        topbarEl.removeEventListener("mouseenter", handleTopbarMouseEnter);
+      }
+    };
+  }, [handleTopEdgeHover, exitFocusMode, isFocusMode]);
 
   // Model selection state
   const [selectedModel, setSelectedModel] = useState(() => {
@@ -1403,7 +1460,7 @@ export default function App() {
   return (
     <>
       {/* React App - thay thế HTML tĩnh */}
-      <div className="topbar" data-react="true">
+      <div className="topbar" data-react="true" ref={topbarRef}>
         {/* Left: Clock */}
         <div className="tbLeft">
           <div id="clockWidget" className="clockWidget" aria-label="Clock">
@@ -1460,7 +1517,7 @@ export default function App() {
         <div id="topbarResizer" className="topbarResizer" role="separator" aria-orientation="horizontal" aria-label="Resize topbar"></div>
       </div>
 
-      <div className="app" data-react="true">
+      <div className="app" data-react="true" data-rail-hidden={isFocusMode ? "true" : undefined}>
         {/* Phần 1: Sidebar menu (200px) */}
         <div className="leftPane">
           <SidebarMenu />
@@ -1468,7 +1525,7 @@ export default function App() {
 
         {/* Phần 2: Phần giữa (fill khoảng trống) */}
         <div className="middlePane">
-          {/* Phần giữa trống, có thể thêm nội dung sau */}
+          <WritingPane />
         </div>
 
         {/* Phần 3: Chat panel */}
@@ -1526,6 +1583,7 @@ export default function App() {
                           className="copyBtn"
                           type="button"
                           data-tooltip={copiedStates[t.id] ? "Copied" : "Copy"}
+                          data-copied={copiedStates[t.id] ? "true" : "false"}
                           onClick={async () => {
                             try {
                               await navigator.clipboard.writeText(t.user);
